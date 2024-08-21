@@ -39,7 +39,9 @@ class STrack(BaseTrack):
         for i, st in enumerate(stracks):
             if st.state != TrackState.Tracked:
                 multi_mean[i][7] = 0
-        multi_mean, multi_covariance = STrack.shared_kalman.multi_predict(multi_mean, multi_covariance)
+        multi_mean, multi_covariance = STrack.shared_kalman.multi_predict(
+            multi_mean, multi_covariance
+        )
         for i, (mean, cov) in enumerate(zip(multi_mean, multi_covariance)):
             stracks[i].mean = mean
             stracks[i].covariance = cov
@@ -78,8 +80,9 @@ class STrack(BaseTrack):
 
     def re_activate(self, new_track, frame_id, new_id=False):
         """Reactivates a previously lost track with a new detection."""
-        self.mean, self.covariance = self.kalman_filter.update(self.mean, self.covariance,
-                                                               self.convert_coords(new_track.tlwh))
+        self.mean, self.covariance = self.kalman_filter.update(
+            self.mean, self.covariance, self.convert_coords(new_track.tlwh)
+        )
         self.tracklet_len = 0
         self.state = TrackState.Tracked
         self.is_activated = True
@@ -101,8 +104,9 @@ class STrack(BaseTrack):
         self.tracklet_len += 1
 
         new_tlwh = new_track.tlwh
-        self.mean, self.covariance = self.kalman_filter.update(self.mean, self.covariance,
-                                                               self.convert_coords(new_tlwh))
+        self.mean, self.covariance = self.kalman_filter.update(
+            self.mean, self.covariance, self.convert_coords(new_tlwh)
+        )
         self.state = TrackState.Tracked
         self.is_activated = True
 
@@ -161,11 +165,10 @@ class STrack(BaseTrack):
 
     def __repr__(self):
         """Return a string representation of the BYTETracker object with start and end frames and track ID."""
-        return f'OT_{self.track_id}_({self.start_frame}-{self.end_frame})'
+        return f"OT_{self.track_id}_({self.start_frame}-{self.end_frame})"
 
 
 class BYTETracker:
-
     def __init__(self, args, frame_rate=30):
         """Initialize a YOLOv8 object to track objects with given arguments and frame rate."""
         self.tracked_stracks = []  # type: list[STrack]
@@ -217,13 +220,15 @@ class BYTETracker:
         strack_pool = self.joint_stracks(tracked_stracks, self.lost_stracks)
         # Predict the current location with KF
         self.multi_predict(strack_pool)
-        if hasattr(self, 'gmc') and img is not None:
+        if hasattr(self, "gmc") and img is not None:
             warp = self.gmc.apply(img, dets)
             STrack.multi_gmc(strack_pool, warp)
             STrack.multi_gmc(unconfirmed, warp)
 
         dists = self.get_dists(strack_pool, detections)
-        matches, u_track, u_detection = matching.linear_assignment(dists, thresh=self.args.match_thresh)
+        matches, u_track, u_detection = matching.linear_assignment(
+            dists, thresh=self.args.match_thresh
+        )
 
         for itracked, idet in matches:
             track = strack_pool[itracked]
@@ -237,7 +242,9 @@ class BYTETracker:
         # Step 3: Second association, with low score detection boxes
         # association the untrack to the low score detections
         detections_second = self.init_track(dets_second, scores_second, cls_second, img)
-        r_tracked_stracks = [strack_pool[i] for i in u_track if strack_pool[i].state == TrackState.Tracked]
+        r_tracked_stracks = [
+            strack_pool[i] for i in u_track if strack_pool[i].state == TrackState.Tracked
+        ]
         # TODO
         dists = matching.iou_distance(r_tracked_stracks, detections_second)
         matches, u_track, u_detection_second = matching.linear_assignment(dists, thresh=0.5)
@@ -286,13 +293,22 @@ class BYTETracker:
         self.lost_stracks = self.sub_stracks(self.lost_stracks, self.tracked_stracks)
         self.lost_stracks.extend(lost_stracks)
         self.lost_stracks = self.sub_stracks(self.lost_stracks, self.removed_stracks)
-        self.tracked_stracks, self.lost_stracks = self.remove_duplicate_stracks(self.tracked_stracks, self.lost_stracks)
+        self.tracked_stracks, self.lost_stracks = self.remove_duplicate_stracks(
+            self.tracked_stracks, self.lost_stracks
+        )
         self.removed_stracks.extend(removed_stracks)
         if len(self.removed_stracks) > 1000:
-            self.removed_stracks = self.removed_stracks[-999:]  # clip remove stracks to 1000 maximum
+            self.removed_stracks = self.removed_stracks[
+                -999:
+            ]  # clip remove stracks to 1000 maximum
         return np.asarray(
-            [x.tlbr.tolist() + [x.track_id, x.score, x.cls, x.idx] for x in self.tracked_stracks if x.is_activated],
-            dtype=np.float32)
+            [
+                x.tlbr.tolist() + [x.track_id, x.score, x.cls, x.idx]
+                for x in self.tracked_stracks
+                if x.is_activated
+            ],
+            dtype=np.float32,
+        )
 
     def get_kalmanfilter(self):
         """Returns a Kalman filter object for tracking bounding boxes."""
@@ -300,7 +316,9 @@ class BYTETracker:
 
     def init_track(self, dets, scores, cls, img=None):
         """Initialize object tracking with detections and scores using STrack algorithm."""
-        return [STrack(xyxy, s, c) for (xyxy, s, c) in zip(dets, scores, cls)] if len(dets) else []  # detections
+        return (
+            [STrack(xyxy, s, c) for (xyxy, s, c) in zip(dets, scores, cls)] if len(dets) else []
+        )  # detections
 
     def get_dists(self, tracks, detections):
         """Calculates the distance between tracks and detections using IOU and fuses scores."""

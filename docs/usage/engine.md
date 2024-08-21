@@ -80,4 +80,3 @@ To know more about Callback triggering events and entry point, checkout our [Cal
 
 There are other components that can be customized similarly like `Validators` and `Predictors`
 See Reference section for more information on these.
-

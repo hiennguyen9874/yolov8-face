@@ -11,18 +11,17 @@ from .predict import Predictor
 
 
 class SAM:
-
-    def __init__(self, model='sam_b.pt') -> None:
-        if model and not model.endswith('.pt') and not model.endswith('.pth'):
+    def __init__(self, model="sam_b.pt") -> None:
+        if model and not model.endswith(".pt") and not model.endswith(".pth"):
             # Should raise AssertionError instead?
-            raise NotImplementedError('Segment anything prediction requires pre-trained checkpoint')
+            raise NotImplementedError("Segment anything prediction requires pre-trained checkpoint")
         self.model = build_sam(model)
-        self.task = 'segment'  # required
+        self.task = "segment"  # required
         self.predictor = None  # reuse predictor
 
     def predict(self, source, stream=False, bboxes=None, points=None, labels=None, **kwargs):
         """Predicts and returns segmentation masks for given image or video source."""
-        overrides = dict(conf=0.25, task='segment', mode='predict', imgsz=1024)
+        overrides = dict(conf=0.25, task="segment", mode="predict", imgsz=1024)
         overrides.update(kwargs)  # prefer kwargs
         if not self.predictor:
             self.predictor = Predictor(overrides=overrides)
@@ -46,7 +45,9 @@ class SAM:
     def __getattr__(self, attr):
         """Raises error if object has no requested attribute."""
         name = self.__class__.__name__
-        raise AttributeError(f"'{name}' object has no attribute '{attr}'. See valid attributes below.\n{self.__doc__}")
+        raise AttributeError(
+            f"'{name}' object has no attribute '{attr}'. See valid attributes below.\n{self.__doc__}"
+        )
 
     def info(self, detailed=False, verbose=True):
         """

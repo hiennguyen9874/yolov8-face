@@ -5,4 +5,4 @@ from .predict import Predictor
 
 # from .build import build_sam
 
-__all__ = 'SAM', 'Predictor'  # tuple or list
+__all__ = "SAM", "Predictor"  # tuple or list

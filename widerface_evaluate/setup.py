@@ -5,9 +5,10 @@ mail: tianhengcheng@gmail.com
 copyright@wondervictor
 """
 
-from distutils.core import setup, Extension
-from Cython.Build import cythonize
-import numpy
+from distutils.core import Extension, setup
 
-package = Extension('bbox', ['box_overlaps.pyx'], include_dirs=[numpy.get_include()])
+import numpy
+from Cython.Build import cythonize
+
+package = Extension("bbox", ["box_overlaps.pyx"], include_dirs=[numpy.get_include()])
 setup(ext_modules=cythonize([package]))

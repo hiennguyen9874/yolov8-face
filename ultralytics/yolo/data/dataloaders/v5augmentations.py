@@ -12,7 +12,7 @@ import torch
 import torchvision.transforms as T
 import torchvision.transforms.functional as TF
 
-from ultralytics.yolo.utils import LOGGER, colorstr
+from ultralytics.yolo.utils import colorstr, LOGGER
 from ultralytics.yolo.utils.checks import check_version
 from ultralytics.yolo.utils.metrics import bbox_ioa
 from ultralytics.yolo.utils.ops import resample_segments, segment2box, xywhn2xyxy
@@ -26,33 +26,46 @@ class Albumentations:
     def __init__(self, size=640):
         """Instantiate object with image augmentations for YOLOv5."""
         self.transform = None
-        prefix = colorstr('albumentations: ')
+        prefix = colorstr("albumentations: ")
         try:
             import albumentations as A
-            check_version(A.__version__, '1.0.3', hard=True)  # version requirement
+
+            check_version(A.__version__, "1.0.3", hard=True)  # version requirement
 
             T = [
-                A.RandomResizedCrop(height=size, width=size, scale=(0.8, 1.0), ratio=(0.9, 1.11), p=0.0),
+                A.RandomResizedCrop(
+                    height=size, width=size, scale=(0.8, 1.0), ratio=(0.9, 1.11), p=0.0
+                ),
                 A.Blur(p=0.01),
                 A.MedianBlur(p=0.01),
                 A.ToGray(p=0.01),
                 A.CLAHE(p=0.01),
                 A.RandomBrightnessContrast(p=0.0),
                 A.RandomGamma(p=0.0),
-                A.ImageCompression(quality_lower=75, p=0.0)]  # transforms
-            self.transform = A.Compose(T, bbox_params=A.BboxParams(format='yolo', label_fields=['class_labels']))
+                A.ImageCompression(quality_lower=75, p=0.0),
+            ]  # transforms
+            self.transform = A.Compose(
+                T, bbox_params=A.BboxParams(format="yolo", label_fields=["class_labels"])
+            )
 
-            LOGGER.info(prefix + ', '.join(f'{x}'.replace('always_apply=False, ', '') for x in T if x.p))
+            LOGGER.info(
+                prefix + ", ".join(f"{x}".replace("always_apply=False, ", "") for x in T if x.p)
+            )
         except ImportError:  # package not installed, skip
             pass
         except Exception as e:
-            LOGGER.info(f'{prefix}{e}')
+            LOGGER.info(f"{prefix}{e}")
 
     def __call__(self, im, labels, p=1.0):
         """Transforms input image and labels with probability 'p'."""
         if self.transform and random.random() < p:
-            new = self.transform(image=im, bboxes=labels[:, 1:], class_labels=labels[:, 0])  # transformed
-            im, labels = new['image'], np.array([[c, *b] for c, b in zip(new['class_labels'], new['bboxes'])])
+            new = self.transform(
+                image=im, bboxes=labels[:, 1:], class_labels=labels[:, 0]
+            )  # transformed
+            im, labels = (
+                new["image"],
+                np.array([[c, *b] for c, b in zip(new["class_labels"], new["bboxes"])]),
+            )
         return im, labels
 
 
@@ -92,7 +105,9 @@ def hist_equalize(im, clahe=True, bgr=False):
         yuv[:, :, 0] = c.apply(yuv[:, :, 0])
     else:
         yuv[:, :, 0] = cv2.equalizeHist(yuv[:, :, 0])  # equalize Y channel histogram
-    return cv2.cvtColor(yuv, cv2.COLOR_YUV2BGR if bgr else cv2.COLOR_YUV2RGB)  # convert YUV image to RGB
+    return cv2.cvtColor(
+        yuv, cv2.COLOR_YUV2BGR if bgr else cv2.COLOR_YUV2RGB
+    )  # convert YUV image to RGB
 
 
 def replicate(im, labels):
@@ -101,7 +116,7 @@ def replicate(im, labels):
     boxes = labels[:, 1:].astype(int)
     x1, y1, x2, y2 = boxes.T
     s = ((x2 - x1) + (y2 - y1)) / 2  # side length (pixels)
-    for i in s.argsort()[:round(s.size * 0.5)]:  # smallest indices
+    for i in s.argsort()[: round(s.size * 0.5)]:  # smallest indices
         x1b, y1b, x2b, y2b = boxes[i]
         bh, bw = y2b - y1b, x2b - x1b
         yc, xc = int(random.uniform(0, h - bh)), int(random.uniform(0, w - bw))  # offset x, y
@@ -112,7 +127,15 @@ def replicate(im, labels):
     return im, labels
 
 
-def letterbox(im, new_shape=(640, 640), color=(114, 114, 114), auto=True, scaleFill=False, scaleup=True, stride=32):
+def letterbox(
+    im,
+    new_shape=(640, 640),
+    color=(114, 114, 114),
+    auto=True,
+    scaleFill=False,
+    scaleup=True,
+    stride=32,
+):
     """Resize and pad image while meeting stride-multiple constraints."""
     shape = im.shape[:2]  # current shape [height, width]
     if isinstance(new_shape, int):
@@ -141,19 +164,23 @@ def letterbox(im, new_shape=(640, 640), color=(114, 114, 114), auto=True, scaleF
         im = cv2.resize(im, new_unpad, interpolation=cv2.INTER_LINEAR)
     top, bottom = int(round(dh - 0.1)), int(round(dh + 0.1))
     left, right = int(round(dw - 0.1)), int(round(dw + 0.1))
-    im = cv2.copyMakeBorder(im, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)  # add border
+    im = cv2.copyMakeBorder(
+        im, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color
+    )  # add border
     return im, ratio, (dw, dh)
 
 
-def random_perspective(im,
-                       targets=(),
-                       segments=(),
-                       degrees=10,
-                       translate=.1,
-                       scale=.1,
-                       shear=10,
-                       perspective=0.0,
-                       border=(0, 0)):
+def random_perspective(
+    im,
+    targets=(),
+    segments=(),
+    degrees=10,
+    translate=0.1,
+    scale=0.1,
+    shear=10,
+    perspective=0.0,
+    border=(0, 0),
+):
     # torchvision.transforms.RandomAffine(degrees=(-10, 10), translate=(0.1, 0.1), scale=(0.9, 1.1), shear=(-10, 10))
     # targets = [cls, xyxy]
 
@@ -213,16 +240,22 @@ def random_perspective(im,
                 xy = np.ones((len(segment), 3))
                 xy[:, :2] = segment
                 xy = xy @ M.T  # transform
-                xy = xy[:, :2] / xy[:, 2:3] if perspective else xy[:, :2]  # perspective rescale or affine
+                xy = (
+                    xy[:, :2] / xy[:, 2:3] if perspective else xy[:, :2]
+                )  # perspective rescale or affine
 
                 # Clip
                 new[i] = segment2box(xy, width, height)
 
         else:  # warp boxes
             xy = np.ones((n * 4, 3))
-            xy[:, :2] = targets[:, [1, 2, 3, 4, 1, 4, 3, 2]].reshape(n * 4, 2)  # x1y1, x2y2, x1y2, x2y1
+            xy[:, :2] = targets[:, [1, 2, 3, 4, 1, 4, 3, 2]].reshape(
+                n * 4, 2
+            )  # x1y1, x2y2, x1y2, x2y1
             xy = xy @ M.T  # transform
-            xy = (xy[:, :2] / xy[:, 2:3] if perspective else xy[:, :2]).reshape(n, 8)  # perspective rescale or affine
+            xy = (xy[:, :2] / xy[:, 2:3] if perspective else xy[:, :2]).reshape(
+                n, 8
+            )  # perspective rescale or affine
 
             # Create new boxes
             x = xy[:, [0, 2, 4, 6]]
@@ -234,7 +267,9 @@ def random_perspective(im,
             new[:, [1, 3]] = new[:, [1, 3]].clip(0, height)
 
         # Filter candidates
-        i = box_candidates(box1=targets[:, 1:5].T * s, box2=new.T, area_thr=0.01 if use_segments else 0.10)
+        i = box_candidates(
+            box1=targets[:, 1:5].T * s, box2=new.T, area_thr=0.01 if use_segments else 0.10
+        )
         targets = targets[i]
         targets[:, 1:5] = new[i]
 
@@ -249,7 +284,9 @@ def copy_paste(im, labels, segments, p=0.5):
         im_new = np.zeros(im.shape, np.uint8)
 
         # Calculate ioa first then select indexes randomly
-        boxes = np.stack([w - labels[:, 3], labels[:, 2], w - labels[:, 1], labels[:, 4]], axis=-1)  # (n, 4)
+        boxes = np.stack(
+            [w - labels[:, 3], labels[:, 2], w - labels[:, 1], labels[:, 4]], axis=-1
+        )  # (n, 4)
         ioa = bbox_ioa(boxes, labels[:, 1:5])  # intersection over area
         indexes = np.nonzero((ioa < 0.30).all(1))[0]  # (N, )
         n = len(indexes)
@@ -270,7 +307,9 @@ def cutout(im, labels, p=0.5):
     """Applies image cutout augmentation https://arxiv.org/abs/1708.04552."""
     if random.random() < p:
         h, w = im.shape[:2]
-        scales = [0.5] * 1 + [0.25] * 2 + [0.125] * 4 + [0.0625] * 8 + [0.03125] * 16  # image size fraction
+        scales = (
+            [0.5] * 1 + [0.25] * 2 + [0.125] * 4 + [0.0625] * 8 + [0.03125] * 16
+        )  # image size fraction
         for s in scales:
             mask_h = random.randint(1, int(h * s))  # create random masks
             mask_w = random.randint(1, int(w * s))
@@ -301,36 +340,42 @@ def mixup(im, labels, im2, labels2):
     return im, labels
 
 
-def box_candidates(box1, box2, wh_thr=2, ar_thr=100, area_thr=0.1, eps=1e-16):  # box1(4,n), box2(4,n)
+def box_candidates(
+    box1, box2, wh_thr=2, ar_thr=100, area_thr=0.1, eps=1e-16
+):  # box1(4,n), box2(4,n)
     # Compute candidate boxes: box1 before augment, box2 after augment, wh_thr (pixels), aspect_ratio_thr, area_ratio
     w1, h1 = box1[2] - box1[0], box1[3] - box1[1]
     w2, h2 = box2[2] - box2[0], box2[3] - box2[1]
     ar = np.maximum(w2 / (h2 + eps), h2 / (w2 + eps))  # aspect ratio
-    return (w2 > wh_thr) & (h2 > wh_thr) & (w2 * h2 / (w1 * h1 + eps) > area_thr) & (ar < ar_thr)  # candidates
+    return (
+        (w2 > wh_thr) & (h2 > wh_thr) & (w2 * h2 / (w1 * h1 + eps) > area_thr) & (ar < ar_thr)
+    )  # candidates
 
 
 def classify_albumentations(
-        augment=True,
-        size=224,
-        scale=(0.08, 1.0),
-        ratio=(0.75, 1.0 / 0.75),  # 0.75, 1.33
-        hflip=0.5,
-        vflip=0.0,
-        jitter=0.4,
-        mean=IMAGENET_MEAN,
-        std=IMAGENET_STD,
-        auto_aug=False):
+    augment=True,
+    size=224,
+    scale=(0.08, 1.0),
+    ratio=(0.75, 1.0 / 0.75),  # 0.75, 1.33
+    hflip=0.5,
+    vflip=0.0,
+    jitter=0.4,
+    mean=IMAGENET_MEAN,
+    std=IMAGENET_STD,
+    auto_aug=False,
+):
     # YOLOv5 classification Albumentations (optional, only used if package is installed)
-    prefix = colorstr('albumentations: ')
+    prefix = colorstr("albumentations: ")
     try:
         import albumentations as A
         from albumentations.pytorch import ToTensorV2
-        check_version(A.__version__, '1.0.3', hard=True)  # version requirement
+
+        check_version(A.__version__, "1.0.3", hard=True)  # version requirement
         if augment:  # Resize and crop
             T = [A.RandomResizedCrop(height=size, width=size, scale=scale, ratio=ratio)]
             if auto_aug:
                 # TODO: implement AugMix, AutoAug & RandAug in albumentation
-                LOGGER.info(f'{prefix}auto augmentations are currently not supported')
+                LOGGER.info(f"{prefix}auto augmentations are currently not supported")
             else:
                 if hflip > 0:
                     T += [A.HorizontalFlip(p=hflip)]
@@ -338,22 +383,30 @@ def classify_albumentations(
                     T += [A.VerticalFlip(p=vflip)]
                 if jitter > 0:
                     jitter = float(jitter)
-                    T += [A.ColorJitter(jitter, jitter, jitter, 0)]  # brightness, contrast, satuaration, 0 hue
+                    T += [
+                        A.ColorJitter(jitter, jitter, jitter, 0)
+                    ]  # brightness, contrast, satuaration, 0 hue
         else:  # Use fixed crop for eval set (reproducibility)
             T = [A.SmallestMaxSize(max_size=size), A.CenterCrop(height=size, width=size)]
         T += [A.Normalize(mean=mean, std=std), ToTensorV2()]  # Normalize and convert to Tensor
-        LOGGER.info(prefix + ', '.join(f'{x}'.replace('always_apply=False, ', '') for x in T if x.p))
+        LOGGER.info(
+            prefix + ", ".join(f"{x}".replace("always_apply=False, ", "") for x in T if x.p)
+        )
         return A.Compose(T)
 
     except ImportError:  # package not installed, skip
-        LOGGER.warning(f'{prefix}⚠️ not found, install with `pip install albumentations` (recommended)')
+        LOGGER.warning(
+            f"{prefix}⚠️ not found, install with `pip install albumentations` (recommended)"
+        )
     except Exception as e:
-        LOGGER.info(f'{prefix}{e}')
+        LOGGER.info(f"{prefix}{e}")
 
 
 def classify_transforms(size=224):
     """Transforms to apply if albumentations not installed."""
-    assert isinstance(size, int), f'ERROR: classify_transforms size {size} must be integer, not (list, tuple)'
+    assert isinstance(
+        size, int
+    ), f"ERROR: classify_transforms size {size} must be integer, not (list, tuple)"
     # T.Compose([T.ToTensor(), T.Resize(size), T.CenterCrop(size), T.Normalize(IMAGENET_MEAN, IMAGENET_STD)])
     return T.Compose([CenterCrop(size), ToTensor(), T.Normalize(IMAGENET_MEAN, IMAGENET_STD)])
 
@@ -371,10 +424,15 @@ class LetterBox:
         imh, imw = im.shape[:2]
         r = min(self.h / imh, self.w / imw)  # ratio of new/old
         h, w = round(imh * r), round(imw * r)  # resized image
-        hs, ws = (math.ceil(x / self.stride) * self.stride for x in (h, w)) if self.auto else self.h, self.w
+        hs, ws = (
+            (math.ceil(x / self.stride) * self.stride for x in (h, w)) if self.auto else self.h,
+            self.w,
+        )
         top, left = round((hs - h) / 2 - 0.1), round((ws - w) / 2 - 0.1)
         im_out = np.full((self.h, self.w, 3), 114, dtype=im.dtype)
-        im_out[top:top + h, left:left + w] = cv2.resize(im, (w, h), interpolation=cv2.INTER_LINEAR)
+        im_out[top : top + h, left : left + w] = cv2.resize(
+            im, (w, h), interpolation=cv2.INTER_LINEAR
+        )
         return im_out
 
 
@@ -389,7 +447,9 @@ class CenterCrop:
         imh, imw = im.shape[:2]
         m = min(imh, imw)  # min dimension
         top, left = (imh - m) // 2, (imw - m) // 2
-        return cv2.resize(im[top:top + m, left:left + m], (self.w, self.h), interpolation=cv2.INTER_LINEAR)
+        return cv2.resize(
+            im[top : top + m, left : left + m], (self.w, self.h), interpolation=cv2.INTER_LINEAR
+        )
 
 
 class ToTensor:
@@ -400,7 +460,9 @@ class ToTensor:
         self.half = half
 
     def __call__(self, im):  # im = np.array HWC in BGR order
-        im = np.ascontiguousarray(im.transpose((2, 0, 1))[::-1])  # HWC to CHW -> BGR to RGB -> contiguous
+        im = np.ascontiguousarray(
+            im.transpose((2, 0, 1))[::-1]
+        )  # HWC to CHW -> BGR to RGB -> contiguous
         im = torch.from_numpy(im)  # to torch
         im = im.half() if self.half else im.float()  # uint8 to fp16/32
         im /= 255.0  # 0-255 to 0.0-1.0

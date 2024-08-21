@@ -19,15 +19,15 @@ full list of export arguments.
 !!! example ""
 
     === "Python"
-    
+
         ```python
         from ultralytics.yolo.utils.benchmarks import benchmark
-        
+
         # Benchmark
         benchmark(model='yolov8n.pt', imgsz=640, half=False, device=0)
         ```
     === "CLI"
-    
+
         ```bash
         yolo benchmark model=yolov8n.pt imgsz=640 half=False device=0
         ```

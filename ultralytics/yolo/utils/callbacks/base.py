@@ -145,37 +145,35 @@ def on_export_end(exporter):
 
 default_callbacks = {
     # Run in trainer
-    'on_pretrain_routine_start': [on_pretrain_routine_start],
-    'on_pretrain_routine_end': [on_pretrain_routine_end],
-    'on_train_start': [on_train_start],
-    'on_train_epoch_start': [on_train_epoch_start],
-    'on_train_batch_start': [on_train_batch_start],
-    'optimizer_step': [optimizer_step],
-    'on_before_zero_grad': [on_before_zero_grad],
-    'on_train_batch_end': [on_train_batch_end],
-    'on_train_epoch_end': [on_train_epoch_end],
-    'on_fit_epoch_end': [on_fit_epoch_end],  # fit = train + val
-    'on_model_save': [on_model_save],
-    'on_train_end': [on_train_end],
-    'on_params_update': [on_params_update],
-    'teardown': [teardown],
-
+    "on_pretrain_routine_start": [on_pretrain_routine_start],
+    "on_pretrain_routine_end": [on_pretrain_routine_end],
+    "on_train_start": [on_train_start],
+    "on_train_epoch_start": [on_train_epoch_start],
+    "on_train_batch_start": [on_train_batch_start],
+    "optimizer_step": [optimizer_step],
+    "on_before_zero_grad": [on_before_zero_grad],
+    "on_train_batch_end": [on_train_batch_end],
+    "on_train_epoch_end": [on_train_epoch_end],
+    "on_fit_epoch_end": [on_fit_epoch_end],  # fit = train + val
+    "on_model_save": [on_model_save],
+    "on_train_end": [on_train_end],
+    "on_params_update": [on_params_update],
+    "teardown": [teardown],
     # Run in validator
-    'on_val_start': [on_val_start],
-    'on_val_batch_start': [on_val_batch_start],
-    'on_val_batch_end': [on_val_batch_end],
-    'on_val_end': [on_val_end],
-
+    "on_val_start": [on_val_start],
+    "on_val_batch_start": [on_val_batch_start],
+    "on_val_batch_end": [on_val_batch_end],
+    "on_val_end": [on_val_end],
     # Run in predictor
-    'on_predict_start': [on_predict_start],
-    'on_predict_batch_start': [on_predict_batch_start],
-    'on_predict_postprocess_end': [on_predict_postprocess_end],
-    'on_predict_batch_end': [on_predict_batch_end],
-    'on_predict_end': [on_predict_end],
-
+    "on_predict_start": [on_predict_start],
+    "on_predict_batch_start": [on_predict_batch_start],
+    "on_predict_postprocess_end": [on_predict_postprocess_end],
+    "on_predict_batch_end": [on_predict_batch_end],
+    "on_predict_end": [on_predict_end],
     # Run in exporter
-    'on_export_start': [on_export_start],
-    'on_export_end': [on_export_end]}
+    "on_export_start": [on_export_start],
+    "on_export_end": [on_export_end],
+}
 
 
 def get_default_callbacks():
@@ -206,7 +204,17 @@ def add_integration_callbacks(instance):
     from .tensorboard import callbacks as tensorboard_cb
     from .wb import callbacks as wb_cb
 
-    for x in clearml_cb, comet_cb, hub_cb, mlflow_cb, neptune_cb, tune_cb, tensorboard_cb, wb_cb, dvc_cb:
+    for x in (
+        clearml_cb,
+        comet_cb,
+        hub_cb,
+        mlflow_cb,
+        neptune_cb,
+        tune_cb,
+        tensorboard_cb,
+        wb_cb,
+        dvc_cb,
+    ):
         for k, v in x.items():
             if v not in instance.callbacks[k]:  # prevent duplicate callbacks addition
                 instance.callbacks[k].append(v)  # callback[name].append(func)

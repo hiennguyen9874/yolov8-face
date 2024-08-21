@@ -11,16 +11,16 @@ from ultralytics import YOLO
 from ultralytics.yolo.data.build import load_inference_source
 from ultralytics.yolo.utils import LINUX, ONLINE, ROOT, SETTINGS
 
-MODEL = Path(SETTINGS['weights_dir']) / 'yolov8n.pt'
-CFG = 'yolov8n.yaml'
-SOURCE = ROOT / 'assets/bus.jpg'
-SOURCE_GREYSCALE = Path(f'{SOURCE.parent / SOURCE.stem}_greyscale.jpg')
-SOURCE_RGBA = Path(f'{SOURCE.parent / SOURCE.stem}_4ch.png')
+MODEL = Path(SETTINGS["weights_dir"]) / "yolov8n.pt"
+CFG = "yolov8n.yaml"
+SOURCE = ROOT / "assets/bus.jpg"
+SOURCE_GREYSCALE = Path(f"{SOURCE.parent / SOURCE.stem}_greyscale.jpg")
+SOURCE_RGBA = Path(f"{SOURCE.parent / SOURCE.stem}_4ch.png")
 
 # Convert SOURCE to greyscale and 4-ch
 im = Image.open(SOURCE)
-im.convert('L').save(SOURCE_GREYSCALE)  # greyscale
-im.convert('RGBA').save(SOURCE_RGBA)  # 4-ch PNG with alpha
+im.convert("L").save(SOURCE_GREYSCALE)  # greyscale
+im.convert("RGBA").save(SOURCE_RGBA)  # 4-ch PNG with alpha
 
 
 def test_model_forward():
@@ -44,13 +44,13 @@ def test_model_fuse():
 
 def test_predict_dir():
     model = YOLO(MODEL)
-    model(source=ROOT / 'assets')
+    model(source=ROOT / "assets")
 
 
 def test_predict_img():
     model = YOLO(MODEL)
-    seg_model = YOLO('yolov8n-seg.pt')
-    cls_model = YOLO('yolov8n-cls.pt')
+    seg_model = YOLO("yolov8n-seg.pt")
+    cls_model = YOLO("yolov8n-cls.pt")
     im = cv2.imread(str(SOURCE))
     assert len(model(source=Image.open(SOURCE), save=True, verbose=True)) == 1  # PIL
     assert len(model(source=im, save=True, save_txt=True)) == 1  # ndarray
@@ -60,10 +60,11 @@ def test_predict_img():
     batch = [
         str(SOURCE),  # filename
         Path(SOURCE),  # Path
-        'https://ultralytics.com/images/zidane.jpg' if ONLINE else SOURCE,  # URI
+        "https://ultralytics.com/images/zidane.jpg" if ONLINE else SOURCE,  # URI
         cv2.imread(str(SOURCE)),  # OpenCV
         Image.open(SOURCE),  # PIL
-        np.zeros((320, 640, 3))]  # numpy
+        np.zeros((320, 640, 3)),
+    ]  # numpy
     assert len(model(batch)) == len(batch)  # multiple sources in a batch
 
     # Test tensor inference
@@ -88,60 +89,61 @@ def test_predict_grey_and_4ch():
 
 def test_val():
     model = YOLO(MODEL)
-    model.val(data='coco8.yaml', imgsz=32)
+    model.val(data="coco8.yaml", imgsz=32)
 
 
 def test_val_scratch():
     model = YOLO(CFG)
-    model.val(data='coco8.yaml', imgsz=32)
+    model.val(data="coco8.yaml", imgsz=32)
 
 
 def test_amp():
     if torch.cuda.is_available():
         from ultralytics.yolo.engine.trainer import check_amp
+
         model = YOLO(MODEL).model.cuda()
         assert check_amp(model)
 
 
 def test_train_scratch():
     model = YOLO(CFG)
-    model.train(data='coco8.yaml', epochs=1, imgsz=32)
+    model.train(data="coco8.yaml", epochs=1, imgsz=32)
     model(SOURCE)
 
 
 def test_train_pretrained():
     model = YOLO(MODEL)
-    model.train(data='coco8.yaml', epochs=1, imgsz=32)
+    model.train(data="coco8.yaml", epochs=1, imgsz=32)
     model(SOURCE)
 
 
 def test_export_torchscript():
     model = YOLO(MODEL)
-    f = model.export(format='torchscript')
+    f = model.export(format="torchscript")
     YOLO(f)(SOURCE)  # exported model inference
 
 
 def test_export_torchscript_scratch():
     model = YOLO(CFG)
-    f = model.export(format='torchscript')
+    f = model.export(format="torchscript")
     YOLO(f)(SOURCE)  # exported model inference
 
 
 def test_export_onnx():
     model = YOLO(MODEL)
-    f = model.export(format='onnx')
+    f = model.export(format="onnx")
     YOLO(f)(SOURCE)  # exported model inference
 
 
 def test_export_openvino():
     model = YOLO(MODEL)
-    f = model.export(format='openvino')
+    f = model.export(format="openvino")
     YOLO(f)(SOURCE)  # exported model inference
 
 
 def test_export_coreml():  # sourcery skip: move-assign
     model = YOLO(MODEL)
-    model.export(format='coreml')
+    model.export(format="coreml")
     # if MACOS:
     #    YOLO(f)(SOURCE)  # model prediction only supported on macOS
 
@@ -150,7 +152,7 @@ def test_export_tflite(enabled=False):
     # TF suffers from install conflicts on Windows and macOS
     if enabled and LINUX:
         model = YOLO(MODEL)
-        f = model.export(format='tflite')
+        f = model.export(format="tflite")
         YOLO(f)(SOURCE)
 
 
@@ -158,7 +160,7 @@ def test_export_pb(enabled=False):
     # TF suffers from install conflicts on Windows and macOS
     if enabled and LINUX:
         model = YOLO(MODEL)
-        f = model.export(format='pb')
+        f = model.export(format="pb")
         YOLO(f)(SOURCE)
 
 
@@ -166,20 +168,20 @@ def test_export_paddle(enabled=False):
     # Paddle protobuf requirements conflicting with onnx protobuf requirements
     if enabled:
         model = YOLO(MODEL)
-        model.export(format='paddle')
+        model.export(format="paddle")
 
 
 def test_all_model_yamls():
-    for m in list((ROOT / 'models').rglob('*.yaml')):
+    for m in list((ROOT / "models").rglob("*.yaml")):
         YOLO(m.name)
 
 
 def test_workflow():
     model = YOLO(MODEL)
-    model.train(data='coco8.yaml', epochs=1, imgsz=32)
+    model.train(data="coco8.yaml", epochs=1, imgsz=32)
     model.val()
     model.predict(SOURCE)
-    model.export(format='onnx')  # export a model to ONNX format
+    model.export(format="onnx")  # export a model to ONNX format
 
 
 def test_predict_callback_and_setup():
@@ -192,31 +194,31 @@ def test_predict_callback_and_setup():
         predictor.results = zip(predictor.results, im0s, bs)
 
     model = YOLO(MODEL)
-    model.add_callback('on_predict_batch_end', on_predict_batch_end)
+    model.add_callback("on_predict_batch_end", on_predict_batch_end)
 
     dataset = load_inference_source(source=SOURCE, transforms=model.transforms)
     bs = dataset.bs  # noqa access predictor properties
     results = model.predict(dataset, stream=True)  # source already setup
     for _, (result, im0, bs) in enumerate(results):
-        print('test_callback', im0.shape)
-        print('test_callback', bs)
+        print("test_callback", im0.shape)
+        print("test_callback", bs)
         boxes = result.boxes  # Boxes object for bbox outputs
         print(boxes)
 
 
 def test_result():
-    model = YOLO('yolov8n-seg.pt')
+    model = YOLO("yolov8n-seg.pt")
     res = model([SOURCE, SOURCE])
     res[0].plot(show_conf=False)  # raises warning
     res[0].plot(conf=True, boxes=False, masks=True)
     res[0] = res[0].cpu().numpy()
     print(res[0].path, res[0].masks.masks)
-    model = YOLO('yolov8n.pt')
+    model = YOLO("yolov8n.pt")
     res = model(SOURCE)
     res[0].plot()
     print(res[0].path)
 
-    model = YOLO('yolov8n-cls.pt')
+    model = YOLO("yolov8n-cls.pt")
     res = model(SOURCE)
     res[0].plot(probs=False)
     print(res[0].path)

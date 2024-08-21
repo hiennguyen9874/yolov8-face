@@ -79,7 +79,9 @@ class BOTrack(STrack):
             if st.state != TrackState.Tracked:
                 multi_mean[i][6] = 0
                 multi_mean[i][7] = 0
-        multi_mean, multi_covariance = BOTrack.shared_kalman.multi_predict(multi_mean, multi_covariance)
+        multi_mean, multi_covariance = BOTrack.shared_kalman.multi_predict(
+            multi_mean, multi_covariance
+        )
         for i, (mean, cov) in enumerate(zip(multi_mean, multi_covariance)):
             stracks[i].mean = mean
             stracks[i].covariance = cov
@@ -99,7 +101,6 @@ class BOTrack(STrack):
 
 
 class BOTSORT(BYTETracker):
-
     def __init__(self, args, frame_rate=30):
         """Initialize YOLOv8 object with ReID module and GMC algorithm."""
         super().__init__(args, frame_rate)
@@ -123,14 +124,16 @@ class BOTSORT(BYTETracker):
             return []
         if self.args.with_reid and self.encoder is not None:
             features_keep = self.encoder.inference(img, dets)
-            return [BOTrack(xyxy, s, c, f) for (xyxy, s, c, f) in zip(dets, scores, cls, features_keep)]  # detections
+            return [
+                BOTrack(xyxy, s, c, f) for (xyxy, s, c, f) in zip(dets, scores, cls, features_keep)
+            ]  # detections
         else:
             return [BOTrack(xyxy, s, c) for (xyxy, s, c) in zip(dets, scores, cls)]  # detections
 
     def get_dists(self, tracks, detections):
         """Get distances between tracks and detections using IoU and (optionally) ReID embeddings."""
         dists = matching.iou_distance(tracks, detections)
-        dists_mask = (dists > self.proximity_thresh)
+        dists_mask = dists > self.proximity_thresh
 
         # TODO: mot20
         # if not self.args.mot20:

@@ -11,15 +11,23 @@ from ultralytics.yolo.engine.results import Results
 from ultralytics.yolo.utils import DEFAULT_CFG, ops
 from ultralytics.yolo.utils.torch_utils import select_device
 
-from .amg import (batch_iterator, batched_mask_to_box, build_all_layer_point_grids, calculate_stability_score,
-                  generate_crop_boxes, is_box_near_crop_edge, remove_small_regions, uncrop_boxes_xyxy, uncrop_masks)
+from .amg import (
+    batch_iterator,
+    batched_mask_to_box,
+    build_all_layer_point_grids,
+    calculate_stability_score,
+    generate_crop_boxes,
+    is_box_near_crop_edge,
+    remove_small_regions,
+    uncrop_boxes_xyxy,
+    uncrop_masks,
+)
 from .build import build_sam
 
 
 class Predictor(BasePredictor):
-
     def __init__(self, cfg=DEFAULT_CFG, overrides={}, _callbacks=None):
-        overrides.update(dict(task='segment', mode='predict', imgsz=1024))
+        overrides.update(dict(task="segment", mode="predict", imgsz=1024))
         super().__init__(cfg, overrides, _callbacks)
         # SAM needs retina_masks=True, or the results would be a mess.
         self.args.retina_masks = True
@@ -58,10 +66,20 @@ class Predictor(BasePredictor):
 
         Return: A list of transformed imgs.
         """
-        assert len(im) == 1, 'SAM model has not supported batch inference yet!'
+        assert len(im) == 1, "SAM model has not supported batch inference yet!"
         return [LetterBox(self.args.imgsz, auto=False, center=False)(image=x) for x in im]
 
-    def inference(self, im, bboxes=None, points=None, labels=None, masks=None, multimask_output=False, *args, **kwargs):
+    def inference(
+        self,
+        im,
+        bboxes=None,
+        points=None,
+        labels=None,
+        masks=None,
+        multimask_output=False,
+        *args,
+        **kwargs,
+    ):
         """
         Predict masks for the given input prompts, using the currently set image.
 
@@ -94,7 +112,9 @@ class Predictor(BasePredictor):
             return self.generate(im, *args, **kwargs)
         return self.prompt_inference(im, bboxes, points, labels, masks, multimask_output)
 
-    def prompt_inference(self, im, bboxes=None, points=None, labels=None, masks=None, multimask_output=False):
+    def prompt_inference(
+        self, im, bboxes=None, points=None, labels=None, masks=None, multimask_output=False
+    ):
         """
         Predict masks for the given input prompts, using the currently set image.
 
@@ -126,7 +146,11 @@ class Predictor(BasePredictor):
         features = self.model.image_encoder(im) if self.features is None else self.features
 
         src_shape, dst_shape = self.batch[1][0].shape[:2], im.shape[2:]
-        r = 1.0 if self.segment_all else min(dst_shape[0] / src_shape[0], dst_shape[1] / src_shape[1])
+        r = (
+            1.0
+            if self.segment_all
+            else min(dst_shape[0] / src_shape[0], dst_shape[1] / src_shape[1])
+        )
         # Transform input prompts
         if points is not None:
             points = torch.as_tensor(points, dtype=torch.float32, device=self.device)
@@ -167,18 +191,20 @@ class Predictor(BasePredictor):
         # `d` could be 1 or 3 depends on `multimask_output`.
         return pred_masks.flatten(0, 1), pred_scores.flatten(0, 1)
 
-    def generate(self,
-                 im,
-                 crop_n_layers=0,
-                 crop_overlap_ratio=512 / 1500,
-                 crop_downscale_factor=1,
-                 point_grids=None,
-                 points_stride=32,
-                 points_batch_size=64,
-                 conf_thres=0.88,
-                 stability_score_thresh=0.95,
-                 stability_score_offset=0.95,
-                 crop_nms_thresh=0.7):
+    def generate(
+        self,
+        im,
+        crop_n_layers=0,
+        crop_overlap_ratio=512 / 1500,
+        crop_downscale_factor=1,
+        point_grids=None,
+        points_stride=32,
+        points_batch_size=64,
+        conf_thres=0.88,
+        stability_score_thresh=0.95,
+        stability_score_offset=0.95,
+        crop_nms_thresh=0.7,
+    ):
         """Segment the whole image.
 
         Args:
@@ -226,19 +252,26 @@ class Predictor(BasePredictor):
             area = torch.tensor(w * h, device=im.device)
             points_scale = np.array([[w, h]])  # w, h
             # Crop image and interpolate to input size
-            crop_im = F.interpolate(im[..., y1:y2, x1:x2], (ih, iw), mode='bilinear', align_corners=False)
+            crop_im = F.interpolate(
+                im[..., y1:y2, x1:x2], (ih, iw), mode="bilinear", align_corners=False
+            )
             # (num_points, 2)
             points_for_image = point_grids[layer_idx] * points_scale
             crop_masks, crop_scores, crop_bboxes = [], [], []
-            for (points, ) in batch_iterator(points_batch_size, points_for_image):
-                pred_mask, pred_score = self.prompt_inference(crop_im, points=points, multimask_output=True)
+            for (points,) in batch_iterator(points_batch_size, points_for_image):
+                pred_mask, pred_score = self.prompt_inference(
+                    crop_im, points=points, multimask_output=True
+                )
                 # Interpolate predicted masks to input size
-                pred_mask = F.interpolate(pred_mask[None], (h, w), mode='bilinear', align_corners=False)[0]
+                pred_mask = F.interpolate(
+                    pred_mask[None], (h, w), mode="bilinear", align_corners=False
+                )[0]
                 idx = pred_score > conf_thres
                 pred_mask, pred_score = pred_mask[idx], pred_score[idx]
 
-                stability_score = calculate_stability_score(pred_mask, self.model.mask_threshold,
-                                                            stability_score_offset)
+                stability_score = calculate_stability_score(
+                    pred_mask, self.model.mask_threshold, stability_score_offset
+                )
                 idx = stability_score > stability_score_thresh
                 pred_mask, pred_score = pred_mask[idx], pred_score[idx]
                 # Bool type is much more memory-efficient.
@@ -311,7 +344,9 @@ class Predictor(BasePredictor):
         for i, masks in enumerate([pred_masks]):
             orig_img = orig_imgs[i] if isinstance(orig_imgs, list) else orig_imgs
             if pred_bboxes is not None:
-                pred_bboxes = ops.scale_boxes(img.shape[2:], pred_bboxes.float(), orig_img.shape, padding=False)
+                pred_bboxes = ops.scale_boxes(
+                    img.shape[2:], pred_bboxes.float(), orig_img.shape, padding=False
+                )
                 cls = torch.arange(len(pred_masks), dtype=torch.int32, device=pred_masks.device)
                 pred_bboxes = torch.cat([pred_bboxes, pred_scores[:, None], cls[:, None]], dim=-1)
 
@@ -319,7 +354,11 @@ class Predictor(BasePredictor):
             masks = masks > self.model.mask_threshold  # to bool
             path = self.batch[0]
             img_path = path[i] if isinstance(path, list) else path
-            results.append(Results(orig_img=orig_img, path=img_path, names=names, masks=masks, boxes=pred_bboxes))
+            results.append(
+                Results(
+                    orig_img=orig_img, path=img_path, names=names, masks=masks, boxes=pred_bboxes
+                )
+            )
         # Reset segment-all mode.
         self.segment_all = False
         return results
@@ -339,7 +378,7 @@ class Predictor(BasePredictor):
             model = build_sam(self.args.model)
             self.setup_model(model)
         self.setup_source(image)
-        assert len(self.dataset) == 1, '`set_image` only supports setting one image!'
+        assert len(self.dataset) == 1, "`set_image` only supports setting one image!"
         for batch in self.dataset:
             im = self.preprocess(batch[1])
             self.features = self.model.image_encoder(im)
@@ -369,9 +408,9 @@ class Predictor(BasePredictor):
         scores = []
         for mask in masks:
             mask = mask.cpu().numpy()
-            mask, changed = remove_small_regions(mask, min_area, mode='holes')
+            mask, changed = remove_small_regions(mask, min_area, mode="holes")
             unchanged = not changed
-            mask, changed = remove_small_regions(mask, min_area, mode='islands')
+            mask, changed = remove_small_regions(mask, min_area, mode="islands")
             unchanged = unchanged and not changed
 
             new_masks.append(torch.as_tensor(mask).unsqueeze(0))

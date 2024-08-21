@@ -12,7 +12,7 @@ Model structure (`yolov5l.yaml`):
 
 Some minor changes compared to previous versions:
 
-1. Replace the `Focus` structure with `6x6 Conv2d`(more efficient, refer #4825)  
+1. Replace the `Focus` structure with `6x6 Conv2d`(more efficient, refer #4825)
 2. Replace the `SPP` structure with `SPPF`(more than double the speed)
 
 <details markdown>
@@ -123,7 +123,7 @@ sppf time: 0.20780706405639648
 
 ### 4.1 Compute Losses
 
-The YOLOv5 loss consists of three parts: 
+The YOLOv5 loss consists of three parts:
 
 - Classes loss(BCE loss)
 - Objectness loss(BCE loss)
@@ -137,23 +137,23 @@ The objectness losses of the three prediction layers(`P3`, `P4`, `P5`) are weigh
 ![obj_loss](https://latex.codecogs.com/svg.image?L_{obj}=4.0\cdot&space;L_{obj}^{small}+1.0\cdot&space;L_{obj}^{medium}+0.4\cdot&space;L_{obj}^{large})
 
 ### 4.3 Eliminate Grid Sensitivity
-In YOLOv2 and YOLOv3, the formula for calculating the predicted target information is:  
+In YOLOv2 and YOLOv3, the formula for calculating the predicted target information is:
 
-![b_x](https://latex.codecogs.com/svg.image?b_x=\sigma(t_x)+c_x)  
-![b_y](https://latex.codecogs.com/svg.image?b_y=\sigma(t_y)+c_y)  
-![b_w](https://latex.codecogs.com/svg.image?b_w=p_w\cdot&space;e^{t_w})  
+![b_x](https://latex.codecogs.com/svg.image?b_x=\sigma(t_x)+c_x)
+![b_y](https://latex.codecogs.com/svg.image?b_y=\sigma(t_y)+c_y)
+![b_w](https://latex.codecogs.com/svg.image?b_w=p_w\cdot&space;e^{t_w})
 ![b_h](https://latex.codecogs.com/svg.image?b_h=p_h\cdot&space;e^{t_h})
 
 <img src="https://user-images.githubusercontent.com/31005897/158508027-8bf63c28-8290-467b-8a3e-4ad09235001a.png#pic_center" width=40%>
 
 
 
-In YOLOv5, the formula is:  
+In YOLOv5, the formula is:
 
-![bx](https://latex.codecogs.com/svg.image?b_x=(2\cdot\sigma(t_x)-0.5)+c_x)  
-![by](https://latex.codecogs.com/svg.image?b_y=(2\cdot\sigma(t_y)-0.5)+c_y)  
-![bw](https://latex.codecogs.com/svg.image?b_w=p_w\cdot(2\cdot\sigma(t_w))^2)    
-![bh](https://latex.codecogs.com/svg.image?b_h=p_h\cdot(2\cdot\sigma(t_h))^2)  
+![bx](https://latex.codecogs.com/svg.image?b_x=(2\cdot\sigma(t_x)-0.5)+c_x)
+![by](https://latex.codecogs.com/svg.image?b_y=(2\cdot\sigma(t_y)-0.5)+c_y)
+![bw](https://latex.codecogs.com/svg.image?b_w=p_w\cdot(2\cdot\sigma(t_w))^2)
+![bh](https://latex.codecogs.com/svg.image?b_h=p_h\cdot(2\cdot\sigma(t_h))^2)
 
 Compare the center point offset before and after scaling. The center point offset range is adjusted from (0, 1) to (-0.5, 1.5).
 Therefore, offset can easily get 0 or 1.

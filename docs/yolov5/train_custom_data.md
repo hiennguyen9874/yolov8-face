@@ -1,4 +1,4 @@
-📚 This guide explains how to train your own **custom dataset** with [YOLOv5](https://github.com/ultralytics/yolov5) 🚀.  
+📚 This guide explains how to train your own **custom dataset** with [YOLOv5](https://github.com/ultralytics/yolov5) 🚀.
 UPDATED 26 March 2023.
 
 ## Before You Start
@@ -142,11 +142,11 @@ python train.py --img 640 --epochs 3 --data coco128.yaml --weights yolov5s.pt
 ```
 !!! tip "Tip"
 
-    💡 Add `--cache ram` or `--cache disk` to speed up training (requires significant RAM/disk resources).  
+    💡 Add `--cache ram` or `--cache disk` to speed up training (requires significant RAM/disk resources).
 
 !!! tip "Tip"
 
-    💡 Always train from a local dataset. Mounted or network drives like Google Drive will be very slow. 
+    💡 Always train from a local dataset. Mounted or network drives like Google Drive will be very slow.
 
 All training results are saved to `runs/train/` with incrementing run directories, i.e. `runs/train/exp2`, `runs/train/exp3` etc. For more details see the Training section of our tutorial notebook. <a href="https://colab.research.google.com/github/ultralytics/yolov5/blob/master/tutorial.ipynb"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> <a href="https://www.kaggle.com/ultralytics/yolov5"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open In Kaggle"></a>
 
@@ -154,7 +154,7 @@ All training results are saved to `runs/train/` with incrementing run directorie
 
 #### Comet Logging and Visualization 🌟 NEW
 
-[Comet](https://bit.ly/yolov5-readme-comet) is now fully integrated with YOLOv5. Track and visualize model metrics in real time, save your hyperparameters, datasets, and model checkpoints, and visualize your model predictions with [Comet Custom Panels](https://bit.ly/yolov5-colab-comet-panels)! Comet makes sure you never lose track of your work and makes it easy to share results and collaborate across teams of all sizes! 
+[Comet](https://bit.ly/yolov5-readme-comet) is now fully integrated with YOLOv5. Track and visualize model metrics in real time, save your hyperparameters, datasets, and model checkpoints, and visualize your model predictions with [Comet Custom Panels](https://bit.ly/yolov5-colab-comet-panels)! Comet makes sure you never lose track of your work and makes it easy to share results and collaborate across teams of all sizes!
 
 Getting started is easy:
 ```shell
@@ -187,7 +187,7 @@ You can use ClearML Data to version your dataset and then pass it to YOLOv5 simp
 
 Training results are automatically logged with [Tensorboard](https://www.tensorflow.org/tensorboard) and [CSV](https://github.com/ultralytics/yolov5/pull/4148) loggers to `runs/train`, with a new experiment directory created for each new training as `runs/train/exp2`, `runs/train/exp3`, etc.
 
-This directory contains train and val statistics, mosaics, labels, predictions and augmented mosaics, as well as metrics and charts including precision-recall (PR) curves and confusion matrices. 
+This directory contains train and val statistics, mosaics, labels, predictions and augmented mosaics, as well as metrics and charts including precision-recall (PR) curves and confusion matrices.
 
 <img alt="Local logging results" src="https://github.com/ultralytics/yolov5/releases/download/v1.0/image-local_logging.jpg" width="1280"/>
 

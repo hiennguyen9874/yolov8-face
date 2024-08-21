@@ -13,9 +13,9 @@ try:
 
     assert not TESTS_RUNNING  # do not log pytest
 
-    ver = version('dvclive')
-    if pkg.parse_version(ver) < pkg.parse_version('2.11.0'):
-        LOGGER.debug(f'DVCLive is detected but version {ver} is incompatible (>=2.11 required).')
+    ver = version("dvclive")
+    if pkg.parse_version(ver) < pkg.parse_version("2.11.0"):
+        LOGGER.debug(f"DVCLive is detected but version {ver} is incompatible (>=2.11 required).")
         dvclive = None  # noqa: F811
 except (ImportError, AssertionError, TypeError):
     dvclive = None
@@ -31,17 +31,17 @@ _training_epoch = False
 
 
 def _logger_disabled():
-    return os.getenv('ULTRALYTICS_DVC_DISABLED', 'false').lower() == 'true'
+    return os.getenv("ULTRALYTICS_DVC_DISABLED", "false").lower() == "true"
 
 
-def _log_images(image_path, prefix=''):
+def _log_images(image_path, prefix=""):
     if live:
         live.log_image(os.path.join(prefix, image_path.name), image_path)
 
 
-def _log_plots(plots, prefix=''):
+def _log_plots(plots, prefix=""):
     for name, params in plots.items():
-        timestamp = params['timestamp']
+        timestamp = params["timestamp"]
         if _processed_plots.get(name) != timestamp:
             _log_images(name, prefix)
             _processed_plots[name] = timestamp
@@ -52,15 +52,15 @@ def _log_confusion_matrix(validator):
     preds = []
     matrix = validator.confusion_matrix.matrix
     names = list(validator.names.values())
-    if validator.confusion_matrix.task == 'detect':
-        names += ['background']
+    if validator.confusion_matrix.task == "detect":
+        names += ["background"]
 
     for ti, pred in enumerate(matrix.T.astype(int)):
         for pi, num in enumerate(pred):
             targets.extend([names[ti]] * num)
             preds.extend([names[pi]] * num)
 
-    live.log_sklearn_plot('confusion_matrix', targets, preds, name='cf.json', normalized=True)
+    live.log_sklearn_plot("confusion_matrix", targets, preds, name="cf.json", normalized=True)
 
 
 def on_pretrain_routine_start(trainer):
@@ -69,17 +69,21 @@ def on_pretrain_routine_start(trainer):
         if not _logger_disabled():
             live = dvclive.Live(save_dvc_exp=True, cache_images=True)
             LOGGER.info(
-                'DVCLive is detected and auto logging is enabled (can be disabled with `ULTRALYTICS_DVC_DISABLED=true`).'
+                "DVCLive is detected and auto logging is enabled (can be disabled with `ULTRALYTICS_DVC_DISABLED=true`)."
             )
         else:
-            LOGGER.debug('DVCLive is detected and auto logging is disabled via `ULTRALYTICS_DVC_DISABLED`.')
+            LOGGER.debug(
+                "DVCLive is detected and auto logging is disabled via `ULTRALYTICS_DVC_DISABLED`."
+            )
             live = None
     except Exception as e:
-        LOGGER.warning(f'WARNING ⚠️ DVCLive installed but not initialized correctly, not logging this run. {e}')
+        LOGGER.warning(
+            f"WARNING ⚠️ DVCLive installed but not initialized correctly, not logging this run. {e}"
+        )
 
 
 def on_pretrain_routine_end(trainer):
-    _log_plots(trainer.plots, 'train')
+    _log_plots(trainer.plots, "train")
 
 
 def on_train_start(trainer):
@@ -95,7 +99,11 @@ def on_train_epoch_start(trainer):
 def on_fit_epoch_end(trainer):
     global _training_epoch
     if live and _training_epoch:
-        all_metrics = {**trainer.label_loss_items(trainer.tloss, prefix='train'), **trainer.metrics, **trainer.lr}
+        all_metrics = {
+            **trainer.label_loss_items(trainer.tloss, prefix="train"),
+            **trainer.metrics,
+            **trainer.lr,
+        }
         for metric, value in all_metrics.items():
             live.log_metric(metric, value)
 
@@ -103,8 +111,8 @@ def on_fit_epoch_end(trainer):
             for metric, value in model_info_for_loggers(trainer).items():
                 live.log_metric(metric, value, plot=False)
 
-        _log_plots(trainer.plots, 'train')
-        _log_plots(trainer.validator.plots, 'val')
+        _log_plots(trainer.plots, "train")
+        _log_plots(trainer.validator.plots, "val")
 
         live.next_step()
         _training_epoch = False
@@ -113,12 +121,16 @@ def on_fit_epoch_end(trainer):
 def on_train_end(trainer):
     if live:
         # At the end log the best metrics. It runs validator on the best model internally.
-        all_metrics = {**trainer.label_loss_items(trainer.tloss, prefix='train'), **trainer.metrics, **trainer.lr}
+        all_metrics = {
+            **trainer.label_loss_items(trainer.tloss, prefix="train"),
+            **trainer.metrics,
+            **trainer.lr,
+        }
         for metric, value in all_metrics.items():
             live.log_metric(metric, value, plot=False)
 
-        _log_plots(trainer.plots, 'eval')
-        _log_plots(trainer.validator.plots, 'eval')
+        _log_plots(trainer.plots, "eval")
+        _log_plots(trainer.validator.plots, "eval")
         _log_confusion_matrix(trainer.validator)
 
         if trainer.best.exists():
@@ -127,10 +139,15 @@ def on_train_end(trainer):
         live.end()
 
 
-callbacks = {
-    'on_pretrain_routine_start': on_pretrain_routine_start,
-    'on_pretrain_routine_end': on_pretrain_routine_end,
-    'on_train_start': on_train_start,
-    'on_train_epoch_start': on_train_epoch_start,
-    'on_fit_epoch_end': on_fit_epoch_end,
-    'on_train_end': on_train_end} if dvclive else {}
+callbacks = (
+    {
+        "on_pretrain_routine_start": on_pretrain_routine_start,
+        "on_pretrain_routine_end": on_pretrain_routine_end,
+        "on_train_start": on_train_start,
+        "on_train_epoch_start": on_train_epoch_start,
+        "on_fit_epoch_end": on_fit_epoch_end,
+        "on_train_end": on_train_end,
+    }
+    if dvclive
+    else {}
+)

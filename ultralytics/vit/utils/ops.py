@@ -31,10 +31,18 @@ class HungarianMatcher(nn.Module):
         _cost_mask(bs, num_gts, masks=None, gt_mask=None): Computes the mask cost and dice cost if masks are predicted.
     """
 
-    def __init__(self, cost_gain=None, use_fl=True, with_mask=False, num_sample_points=12544, alpha=0.25, gamma=2.0):
+    def __init__(
+        self,
+        cost_gain=None,
+        use_fl=True,
+        with_mask=False,
+        num_sample_points=12544,
+        alpha=0.25,
+        gamma=2.0,
+    ):
         super().__init__()
         if cost_gain is None:
-            cost_gain = {'class': 1, 'bbox': 5, 'giou': 2, 'mask': 1, 'dice': 1}
+            cost_gain = {"class": 1, "bbox": 5, "giou": 2, "mask": 1, "dice": 1}
         self.cost_gain = cost_gain
         self.use_fl = use_fl
         self.with_mask = with_mask
@@ -42,7 +50,9 @@ class HungarianMatcher(nn.Module):
         self.alpha = alpha
         self.gamma = gamma
 
-    def forward(self, pred_bboxes, pred_scores, gt_bboxes, gt_cls, gt_groups, masks=None, gt_mask=None):
+    def forward(
+        self, pred_bboxes, pred_scores, gt_bboxes, gt_cls, gt_groups, masks=None, gt_mask=None
+    ):
         """
         Forward pass for HungarianMatcher. This function computes costs based on prediction and ground truth
         (classification cost, L1 cost between boxes and GIoU cost between boxes) and finds the optimal matching
@@ -71,7 +81,10 @@ class HungarianMatcher(nn.Module):
         bs, nq, nc = pred_scores.shape
 
         if sum(gt_groups) == 0:
-            return [(torch.tensor([], dtype=torch.long), torch.tensor([], dtype=torch.long)) for _ in range(bs)]
+            return [
+                (torch.tensor([], dtype=torch.long), torch.tensor([], dtype=torch.long))
+                for _ in range(bs)
+            ]
 
         # We flatten to compute the cost matrices in a batch
         # [batch_size * num_queries, num_classes]
@@ -83,22 +96,32 @@ class HungarianMatcher(nn.Module):
         # Compute the classification cost
         pred_scores = pred_scores[:, gt_cls]
         if self.use_fl:
-            neg_cost_class = (1 - self.alpha) * (pred_scores ** self.gamma) * (-(1 - pred_scores + 1e-8).log())
-            pos_cost_class = self.alpha * ((1 - pred_scores) ** self.gamma) * (-(pred_scores + 1e-8).log())
+            neg_cost_class = (
+                (1 - self.alpha) * (pred_scores**self.gamma) * (-(1 - pred_scores + 1e-8).log())
+            )
+            pos_cost_class = (
+                self.alpha * ((1 - pred_scores) ** self.gamma) * (-(pred_scores + 1e-8).log())
+            )
             cost_class = pos_cost_class - neg_cost_class
         else:
             cost_class = -pred_scores
 
         # Compute the L1 cost between boxes
-        cost_bbox = (pred_bboxes.unsqueeze(1) - gt_bboxes.unsqueeze(0)).abs().sum(-1)  # (bs*num_queries, num_gt)
+        cost_bbox = (
+            (pred_bboxes.unsqueeze(1) - gt_bboxes.unsqueeze(0)).abs().sum(-1)
+        )  # (bs*num_queries, num_gt)
 
         # Compute the GIoU cost between boxes, (bs*num_queries, num_gt)
-        cost_giou = 1.0 - bbox_iou(pred_bboxes.unsqueeze(1), gt_bboxes.unsqueeze(0), xywh=True, GIoU=True).squeeze(-1)
+        cost_giou = 1.0 - bbox_iou(
+            pred_bboxes.unsqueeze(1), gt_bboxes.unsqueeze(0), xywh=True, GIoU=True
+        ).squeeze(-1)
 
         # Final cost matrix
-        C = self.cost_gain['class'] * cost_class + \
-            self.cost_gain['bbox'] * cost_bbox + \
-            self.cost_gain['giou'] * cost_giou
+        C = (
+            self.cost_gain["class"] * cost_class
+            + self.cost_gain["bbox"] * cost_bbox
+            + self.cost_gain["giou"] * cost_giou
+        )
         # Compute the mask cost and dice cost
         if self.with_mask:
             C += self._cost_mask(bs, gt_groups, masks, gt_mask)
@@ -107,11 +130,15 @@ class HungarianMatcher(nn.Module):
         indices = [linear_sum_assignment(c[i]) for i, c in enumerate(C.split(gt_groups, -1))]
         gt_groups = torch.as_tensor([0, *gt_groups[:-1]]).cumsum_(0)
         # (idx for queries, idx for gt)
-        return [(torch.tensor(i, dtype=torch.long), torch.tensor(j, dtype=torch.long) + gt_groups[k])
-                for k, (i, j) in enumerate(indices)]
+        return [
+            (torch.tensor(i, dtype=torch.long), torch.tensor(j, dtype=torch.long) + gt_groups[k])
+            for k, (i, j) in enumerate(indices)
+        ]
 
     def _cost_mask(self, bs, num_gts, masks=None, gt_mask=None):
-        assert masks is not None and gt_mask is not None, 'Make sure the input has `mask` and `gt_mask`'
+        assert (
+            masks is not None and gt_mask is not None
+        ), "Make sure the input has `mask` and `gt_mask`"
         # all masks share the same set of points for efficient matching
         sample_points = torch.rand([bs, 1, self.num_sample_points, 2])
         sample_points = 2.0 * sample_points - 1.0
@@ -120,14 +147,22 @@ class HungarianMatcher(nn.Module):
         out_mask = out_mask.flatten(0, 1)
 
         tgt_mask = torch.cat(gt_mask).unsqueeze(1)
-        sample_points = torch.cat([a.repeat(b, 1, 1, 1) for a, b in zip(sample_points, num_gts) if b > 0])
+        sample_points = torch.cat(
+            [a.repeat(b, 1, 1, 1) for a, b in zip(sample_points, num_gts) if b > 0]
+        )
         tgt_mask = F.grid_sample(tgt_mask, sample_points, align_corners=False).squeeze([1, 2])
 
         with torch.cuda.amp.autocast(False):
             # binary cross entropy cost
-            pos_cost_mask = F.binary_cross_entropy_with_logits(out_mask, torch.ones_like(out_mask), reduction='none')
-            neg_cost_mask = F.binary_cross_entropy_with_logits(out_mask, torch.zeros_like(out_mask), reduction='none')
-            cost_mask = torch.matmul(pos_cost_mask, tgt_mask.T) + torch.matmul(neg_cost_mask, 1 - tgt_mask.T)
+            pos_cost_mask = F.binary_cross_entropy_with_logits(
+                out_mask, torch.ones_like(out_mask), reduction="none"
+            )
+            neg_cost_mask = F.binary_cross_entropy_with_logits(
+                out_mask, torch.zeros_like(out_mask), reduction="none"
+            )
+            cost_mask = torch.matmul(pos_cost_mask, tgt_mask.T) + torch.matmul(
+                neg_cost_mask, 1 - tgt_mask.T
+            )
             cost_mask /= self.num_sample_points
 
             # dice cost
@@ -136,18 +171,20 @@ class HungarianMatcher(nn.Module):
             denominator = out_mask.sum(-1, keepdim=True) + tgt_mask.sum(-1).unsqueeze(0)
             cost_dice = 1 - (numerator + 1) / (denominator + 1)
 
-            C = self.cost_gain['mask'] * cost_mask + self.cost_gain['dice'] * cost_dice
+            C = self.cost_gain["mask"] * cost_mask + self.cost_gain["dice"] * cost_dice
         return C
 
 
-def get_cdn_group(batch,
-                  num_classes,
-                  num_queries,
-                  class_embed,
-                  num_dn=100,
-                  cls_noise_ratio=0.5,
-                  box_noise_scale=1.0,
-                  training=False):
+def get_cdn_group(
+    batch,
+    num_classes,
+    num_queries,
+    class_embed,
+    num_dn=100,
+    cls_noise_ratio=0.5,
+    box_noise_scale=1.0,
+    training=False,
+):
     """
     Get contrastive denoising training group. This function creates a contrastive denoising training group with
     positive and negative samples from the ground truths (gt). It applies noise to the class labels and bounding
@@ -173,7 +210,7 @@ def get_cdn_group(batch,
 
     if (not training) or num_dn <= 0:
         return None, None, None, None
-    gt_groups = batch['gt_groups']
+    gt_groups = batch["gt_groups"]
     total_num = sum(gt_groups)
     max_nums = max(gt_groups)
     if max_nums == 0:
@@ -183,9 +220,9 @@ def get_cdn_group(batch,
     num_group = 1 if num_group == 0 else num_group
     # pad gt to max_num of a batch
     bs = len(gt_groups)
-    gt_cls = batch['cls']  # (bs*num, )
-    gt_bbox = batch['bboxes']  # bs*num, 4
-    b_idx = batch['batch_idx']
+    gt_cls = batch["cls"]  # (bs*num, )
+    gt_bbox = batch["bboxes"]  # bs*num, 4
+    b_idx = batch["batch_idx"]
 
     # each group has positive and negative queries.
     dn_cls = gt_cls.repeat(2 * num_group)  # (2*num_group*bs*num, )
@@ -194,14 +231,19 @@ def get_cdn_group(batch,
 
     # positive and negative mask
     # (bs*num*num_group, ), the second total_num*num_group part as negative samples
-    neg_idx = torch.arange(total_num * num_group, dtype=torch.long, device=gt_bbox.device) + num_group * total_num
+    neg_idx = (
+        torch.arange(total_num * num_group, dtype=torch.long, device=gt_bbox.device)
+        + num_group * total_num
+    )
 
     if cls_noise_ratio > 0:
         # half of bbox prob
         mask = torch.rand(dn_cls.shape) < (cls_noise_ratio * 0.5)
         idx = torch.nonzero(mask).squeeze(-1)
         # randomly put a new one here
-        new_label = torch.randint_like(idx, 0, num_classes, dtype=dn_cls.dtype, device=dn_cls.device)
+        new_label = torch.randint_like(
+            idx, 0, num_classes, dtype=dn_cls.dtype, device=dn_cls.device
+        )
         dn_cls[idx] = new_label
 
     if box_noise_scale > 0:
@@ -239,22 +281,31 @@ def get_cdn_group(batch,
     # reconstruct cannot see each other
     for i in range(num_group):
         if i == 0:
-            attn_mask[max_nums * 2 * i:max_nums * 2 * (i + 1), max_nums * 2 * (i + 1):num_dn] = True
+            attn_mask[
+                max_nums * 2 * i : max_nums * 2 * (i + 1), max_nums * 2 * (i + 1) : num_dn
+            ] = True
         if i == num_group - 1:
-            attn_mask[max_nums * 2 * i:max_nums * 2 * (i + 1), :max_nums * i * 2] = True
+            attn_mask[max_nums * 2 * i : max_nums * 2 * (i + 1), : max_nums * i * 2] = True
         else:
-            attn_mask[max_nums * 2 * i:max_nums * 2 * (i + 1), max_nums * 2 * (i + 1):num_dn] = True
-            attn_mask[max_nums * 2 * i:max_nums * 2 * (i + 1), :max_nums * 2 * i] = True
+            attn_mask[
+                max_nums * 2 * i : max_nums * 2 * (i + 1), max_nums * 2 * (i + 1) : num_dn
+            ] = True
+            attn_mask[max_nums * 2 * i : max_nums * 2 * (i + 1), : max_nums * 2 * i] = True
     dn_meta = {
-        'dn_pos_idx': [p.reshape(-1) for p in pos_idx.cpu().split(list(gt_groups), dim=1)],
-        'dn_num_group': num_group,
-        'dn_num_split': [num_dn, num_queries]}
+        "dn_pos_idx": [p.reshape(-1) for p in pos_idx.cpu().split(list(gt_groups), dim=1)],
+        "dn_num_group": num_group,
+        "dn_num_split": [num_dn, num_queries],
+    }
 
-    return padding_cls.to(class_embed.device), padding_bbox.to(class_embed.device), attn_mask.to(
-        class_embed.device), dn_meta
+    return (
+        padding_cls.to(class_embed.device),
+        padding_bbox.to(class_embed.device),
+        attn_mask.to(class_embed.device),
+        dn_meta,
+    )
 
 
 def inverse_sigmoid(x, eps=1e-6):
     """Inverse sigmoid function."""
-    x = x.clip(min=0., max=1.)
+    x = x.clip(min=0.0, max=1.0)
     return torch.log(x / (1 - x + eps) + eps)

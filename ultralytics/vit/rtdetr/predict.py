@@ -9,7 +9,6 @@ from ultralytics.yolo.utils import ops
 
 
 class RTDETRPredictor(BasePredictor):
-
     def postprocess(self, preds, img, orig_imgs):
         """Postprocess predictions and returns a list of Results objects."""
         nd = preds[0].shape[-1]
@@ -29,7 +28,9 @@ class RTDETRPredictor(BasePredictor):
                 pred[..., [1, 3]] *= oh
             path = self.batch[0]
             img_path = path[i] if isinstance(path, list) else path
-            results.append(Results(orig_img=orig_img, path=img_path, names=self.model.names, boxes=pred))
+            results.append(
+                Results(orig_img=orig_img, path=img_path, names=self.model.names, boxes=pred)
+            )
         return results
 
     def pre_transform(self, im):

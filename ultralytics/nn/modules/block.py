@@ -7,11 +7,32 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .conv import Conv, DWConv, GhostConv, LightConv, RepConv, autopad
+from .conv import autopad, Conv, DWConv, GhostConv, LightConv, RepConv
 from .transformer import TransformerBlock
 
-__all__ = ('DFL', 'HGBlock', 'HGStem', 'SPP', 'SPPF', 'C1', 'C2', 'C3', 'C2f', 'C3x', 'C3TR', 'C3Ghost',
-           'GhostBottleneck', 'Bottleneck', 'BottleneckCSP', 'Proto', 'RepC3', 'MP', 'SP', 'SPF')
+__all__ = (
+    "DFL",
+    "HGBlock",
+    "HGStem",
+    "SPP",
+    "SPPF",
+    "C1",
+    "C2",
+    "C3",
+    "C2f",
+    "C3x",
+    "C3TR",
+    "C3Ghost",
+    "GhostBottleneck",
+    "Bottleneck",
+    "BottleneckCSP",
+    "Proto",
+    "RepC3",
+    "MP",
+    "SP",
+    "SPF",
+)
+
 
 class MP(nn.Module):
     def __init__(self, k=2):
@@ -21,6 +42,7 @@ class MP(nn.Module):
     def forward(self, x):
         return self.m(x)
 
+
 class SP(nn.Module):
     def __init__(self, k=3, s=1):
         super(SP, self).__init__()
@@ -29,14 +51,18 @@ class SP(nn.Module):
     def forward(self, x):
         return self.m(x)
 
+
 class SPF(nn.Module):
     def __init__(self, k=3, s=1):
         super(SPF, self).__init__()
         self.n = (k - 1) // 2
-        self.m = nn.Sequential(*[nn.MaxPool2d(kernel_size=3, stride=s, padding=1) for _ in range(self.n)])
+        self.m = nn.Sequential(
+            *[nn.MaxPool2d(kernel_size=3, stride=s, padding=1) for _ in range(self.n)]
+        )
 
     def forward(self, x):
         return self.m(x)
+
 
 # yolov7-lite
 class StemBlock(nn.Module):
@@ -45,16 +71,17 @@ class StemBlock(nn.Module):
         self.stem_1 = Conv(c1, c2, k, s, p, g, act)
         self.stem_2a = Conv(c2, c2 // 2, 1, 1, 0)
         self.stem_2b = Conv(c2 // 2, c2, 3, 2, 1)
-        self.stem_2p = nn.MaxPool2d(kernel_size=2,stride=2,ceil_mode=True)
+        self.stem_2p = nn.MaxPool2d(kernel_size=2, stride=2, ceil_mode=True)
         self.stem_3 = Conv(c2 * 2, c2, 1, 1, 0)
 
     def forward(self, x):
-        stem_1_out  = self.stem_1(x)
+        stem_1_out = self.stem_1(x)
         stem_2a_out = self.stem_2a(stem_1_out)
         stem_2b_out = self.stem_2b(stem_2a_out)
         stem_2p_out = self.stem_2p(stem_1_out)
-        out = self.stem_3(torch.cat((stem_2b_out,stem_2p_out),1))
+        out = self.stem_3(torch.cat((stem_2b_out, stem_2p_out), 1))
         return out
+
 
 class conv_bn_relu_maxpool(nn.Module):
     def __init__(self, c1, c2):  # ch_in, ch_out
@@ -69,15 +96,27 @@ class conv_bn_relu_maxpool(nn.Module):
     def forward(self, x):
         return self.maxpool(self.conv(x))
 
+
 class DWConvblock(nn.Module):
     "Depthwise conv + Pointwise conv"
+
     def __init__(self, in_channels, out_channels, k, s):
         super(DWConvblock, self).__init__()
         self.p = k // 2
-        self.conv1 = nn.Conv2d(in_channels, in_channels, kernel_size=k, stride=s, padding=self.p, groups=in_channels, bias=False)
+        self.conv1 = nn.Conv2d(
+            in_channels,
+            in_channels,
+            kernel_size=k,
+            stride=s,
+            padding=self.p,
+            groups=in_channels,
+            bias=False,
+        )
         self.bn1 = nn.BatchNorm2d(in_channels)
         self.act1 = nn.SiLU(inplace=True)
-        self.conv2 = nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=1, padding=0, bias=False)
+        self.conv2 = nn.Conv2d(
+            in_channels, out_channels, kernel_size=1, stride=1, padding=0, bias=False
+        )
         self.bn2 = nn.BatchNorm2d(out_channels)
         self.act2 = nn.SiLU(inplace=True)
 
@@ -90,6 +129,7 @@ class DWConvblock(nn.Module):
         x = self.act2(x)
         return x
 
+
 class ADD(nn.Module):
     # Stortcut a list of tensors along dimension
     def __init__(self, alpha=0.5):
@@ -99,6 +139,7 @@ class ADD(nn.Module):
     def forward(self, x):
         x1, x2 = x[0], x[1]
         return torch.add(x1, x2, alpha=self.a)
+
 
 def channel_shuffle(x, groups):
     batchsize, num_channels, height, width = x.data.size()
@@ -111,12 +152,13 @@ def channel_shuffle(x, groups):
     x = x.view(batchsize, -1, height, width)
     return x
 
+
 class Shuffle_Block(nn.Module):
     def __init__(self, inp, oup, stride):
         super(Shuffle_Block, self).__init__()
 
         if not (1 <= stride <= 3):
-            raise ValueError('illegal stride value')
+            raise ValueError("illegal stride value")
         self.stride = stride
 
         branch_features = oup // 2
@@ -132,13 +174,23 @@ class Shuffle_Block(nn.Module):
             )
 
         self.branch2 = nn.Sequential(
-            nn.Conv2d(inp if (self.stride > 1) else branch_features,
-                      branch_features, kernel_size=1, stride=1, padding=0, bias=False),
+            nn.Conv2d(
+                inp if (self.stride > 1) else branch_features,
+                branch_features,
+                kernel_size=1,
+                stride=1,
+                padding=0,
+                bias=False,
+            ),
             nn.BatchNorm2d(branch_features),
             nn.SiLU(inplace=True),
-            self.depthwise_conv(branch_features, branch_features, kernel_size=3, stride=self.stride, padding=1),
+            self.depthwise_conv(
+                branch_features, branch_features, kernel_size=3, stride=self.stride, padding=1
+            ),
             nn.BatchNorm2d(branch_features),
-            nn.Conv2d(branch_features, branch_features, kernel_size=1, stride=1, padding=0, bias=False),
+            nn.Conv2d(
+                branch_features, branch_features, kernel_size=1, stride=1, padding=0, bias=False
+            ),
             nn.BatchNorm2d(branch_features),
             nn.SiLU(inplace=True),
         )
@@ -158,7 +210,9 @@ class Shuffle_Block(nn.Module):
 
         return out
 
+
 # end of yolov7-lite
+
 
 class DFL(nn.Module):
     """
@@ -187,7 +241,9 @@ class Proto(nn.Module):
     def __init__(self, c1, c_=256, c2=32):  # ch_in, number of protos, number of masks
         super().__init__()
         self.cv1 = Conv(c1, c_, k=3)
-        self.upsample = nn.ConvTranspose2d(c_, c_, 2, 2, 0, bias=True)  # nn.Upsample(scale_factor=2, mode='nearest')
+        self.upsample = nn.ConvTranspose2d(
+            c_, c_, 2, 2, 0, bias=True
+        )  # nn.Upsample(scale_factor=2, mode='nearest')
         self.cv2 = Conv(c_, c_, k=3)
         self.cv3 = Conv(c_, c2)
 
@@ -297,13 +353,17 @@ class C1(nn.Module):
 class C2(nn.Module):
     """CSP Bottleneck with 2 convolutions."""
 
-    def __init__(self, c1, c2, n=1, shortcut=True, g=1, e=0.5):  # ch_in, ch_out, number, shortcut, groups, expansion
+    def __init__(
+        self, c1, c2, n=1, shortcut=True, g=1, e=0.5
+    ):  # ch_in, ch_out, number, shortcut, groups, expansion
         super().__init__()
         self.c = int(c2 * e)  # hidden channels
         self.cv1 = Conv(c1, 2 * self.c, 1, 1)
         self.cv2 = Conv(2 * self.c, c2, 1)  # optional act=FReLU(c2)
         # self.attention = ChannelAttention(2 * self.c)  # or SpatialAttention()
-        self.m = nn.Sequential(*(Bottleneck(self.c, self.c, shortcut, g, k=((3, 3), (3, 3)), e=1.0) for _ in range(n)))
+        self.m = nn.Sequential(
+            *(Bottleneck(self.c, self.c, shortcut, g, k=((3, 3), (3, 3)), e=1.0) for _ in range(n))
+        )
 
     def forward(self, x):
         """Forward pass through the CSP bottleneck with 2 convolutions."""
@@ -314,12 +374,16 @@ class C2(nn.Module):
 class C2f(nn.Module):
     """CSP Bottleneck with 2 convolutions."""
 
-    def __init__(self, c1, c2, n=1, shortcut=False, g=1, e=0.5):  # ch_in, ch_out, number, shortcut, groups, expansion
+    def __init__(
+        self, c1, c2, n=1, shortcut=False, g=1, e=0.5
+    ):  # ch_in, ch_out, number, shortcut, groups, expansion
         super().__init__()
         self.c = int(c2 * e)  # hidden channels
         self.cv1 = Conv(c1, 2 * self.c, 1, 1)
         self.cv2 = Conv((2 + n) * self.c, c2, 1)  # optional act=FReLU(c2)
-        self.m = nn.ModuleList(Bottleneck(self.c, self.c, shortcut, g, k=((3, 3), (3, 3)), e=1.0) for _ in range(n))
+        self.m = nn.ModuleList(
+            Bottleneck(self.c, self.c, shortcut, g, k=((3, 3), (3, 3)), e=1.0) for _ in range(n)
+        )
 
     def forward(self, x):
         """Forward pass through C2f layer."""
@@ -337,13 +401,17 @@ class C2f(nn.Module):
 class C3(nn.Module):
     """CSP Bottleneck with 3 convolutions."""
 
-    def __init__(self, c1, c2, n=1, shortcut=True, g=1, e=0.5):  # ch_in, ch_out, number, shortcut, groups, expansion
+    def __init__(
+        self, c1, c2, n=1, shortcut=True, g=1, e=0.5
+    ):  # ch_in, ch_out, number, shortcut, groups, expansion
         super().__init__()
         c_ = int(c2 * e)  # hidden channels
         self.cv1 = Conv(c1, c_, 1, 1)
         self.cv2 = Conv(c1, c_, 1, 1)
         self.cv3 = Conv(2 * c_, c2, 1)  # optional act=FReLU(c2)
-        self.m = nn.Sequential(*(Bottleneck(c_, c_, shortcut, g, k=((1, 1), (3, 3)), e=1.0) for _ in range(n)))
+        self.m = nn.Sequential(
+            *(Bottleneck(c_, c_, shortcut, g, k=((1, 1), (3, 3)), e=1.0) for _ in range(n))
+        )
 
     def forward(self, x):
         """Forward pass through the CSP bottleneck with 2 convolutions."""
@@ -357,7 +425,9 @@ class C3x(C3):
         """Initialize C3TR instance and set default parameters."""
         super().__init__(c1, c2, n, shortcut, g, e)
         self.c_ = int(c2 * e)
-        self.m = nn.Sequential(*(Bottleneck(self.c_, self.c_, shortcut, g, k=((1, 3), (3, 1)), e=1) for _ in range(n)))
+        self.m = nn.Sequential(
+            *(Bottleneck(self.c_, self.c_, shortcut, g, k=((1, 3), (3, 1)), e=1) for _ in range(n))
+        )
 
 
 class RepC3(nn.Module):
@@ -405,9 +475,13 @@ class GhostBottleneck(nn.Module):
         self.conv = nn.Sequential(
             GhostConv(c1, c_, 1, 1),  # pw
             DWConv(c_, c_, k, s, act=False) if s == 2 else nn.Identity(),  # dw
-            GhostConv(c_, c2, 1, 1, act=False))  # pw-linear
-        self.shortcut = nn.Sequential(DWConv(c1, c1, k, s, act=False), Conv(c1, c2, 1, 1,
-                                                                            act=False)) if s == 2 else nn.Identity()
+            GhostConv(c_, c2, 1, 1, act=False),
+        )  # pw-linear
+        self.shortcut = (
+            nn.Sequential(DWConv(c1, c1, k, s, act=False), Conv(c1, c2, 1, 1, act=False))
+            if s == 2
+            else nn.Identity()
+        )
 
     def forward(self, x):
         """Applies skip connection and concatenation to input tensor."""
@@ -417,7 +491,9 @@ class GhostBottleneck(nn.Module):
 class Bottleneck(nn.Module):
     """Standard bottleneck."""
 
-    def __init__(self, c1, c2, shortcut=True, g=1, k=(3, 3), e=0.5):  # ch_in, ch_out, shortcut, groups, kernels, expand
+    def __init__(
+        self, c1, c2, shortcut=True, g=1, k=(3, 3), e=0.5
+    ):  # ch_in, ch_out, shortcut, groups, kernels, expand
         super().__init__()
         c_ = int(c2 * e)  # hidden channels
         self.cv1 = Conv(c1, c_, k[0], 1)
@@ -432,7 +508,9 @@ class Bottleneck(nn.Module):
 class BottleneckCSP(nn.Module):
     """CSP Bottleneck https://github.com/WongKinYiu/CrossStagePartialNetworks."""
 
-    def __init__(self, c1, c2, n=1, shortcut=True, g=1, e=0.5):  # ch_in, ch_out, number, shortcut, groups, expansion
+    def __init__(
+        self, c1, c2, n=1, shortcut=True, g=1, e=0.5
+    ):  # ch_in, ch_out, number, shortcut, groups, expansion
         super().__init__()
         c_ = int(c2 * e)  # hidden channels
         self.cv1 = Conv(c1, c_, 1, 1)
@@ -448,6 +526,7 @@ class BottleneckCSP(nn.Module):
         y1 = self.cv3(self.m(self.cv1(x)))
         y2 = self.cv2(x)
         return self.cv4(self.act(self.bn(torch.cat((y1, y2), 1))))
+
 
 class RepBottleneck(nn.Module):
     """Rep bottleneck."""
@@ -587,6 +666,9 @@ class CBFuse(nn.Module):
     def forward(self, xs):
         """Forward pass through CBFuse layer."""
         target_size = xs[-1].shape[2:]
-        res = [F.interpolate(x[self.idx[i]], size=target_size, mode="nearest") for i, x in enumerate(xs[:-1])]
+        res = [
+            F.interpolate(x[self.idx[i]], size=target_size, mode="nearest")
+            for i, x in enumerate(xs[:-1])
+        ]
         out = torch.sum(torch.stack(res + xs[-1:]), dim=0)
         return out

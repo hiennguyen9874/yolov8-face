@@ -1,4 +1,4 @@
-📚 This guide explains how to properly use **multiple** GPUs to train a dataset with YOLOv5 🚀 on single or multiple machine(s).  
+📚 This guide explains how to properly use **multiple** GPUs to train a dataset with YOLOv5 🚀 on single or multiple machine(s).
 UPDATED 25 December 2022.
 
 ## Before You Start
@@ -64,11 +64,11 @@ python -m torch.distributed.run --nproc_per_node 2 train.py --batch 64 --data co
 <details markdown>
   <summary>Use SyncBatchNorm (click to expand)</summary>
 
-[SyncBatchNorm](https://pytorch.org/docs/master/generated/torch.nn.SyncBatchNorm.html) could increase accuracy for multiple gpu training, however, it will slow down training by a significant factor. It is **only** available for Multiple GPU DistributedDataParallel training. 
+[SyncBatchNorm](https://pytorch.org/docs/master/generated/torch.nn.SyncBatchNorm.html) could increase accuracy for multiple gpu training, however, it will slow down training by a significant factor. It is **only** available for Multiple GPU DistributedDataParallel training.
 
 It is best used when the batch-size on **each** GPU is small (<= 8).
 
-To use SyncBatchNorm, simple pass `--sync-bn` to the command like below, 
+To use SyncBatchNorm, simple pass `--sync-bn` to the command like below,
 
 ```bash
 python -m torch.distributed.run --nproc_per_node 2 train.py --batch 64 --data coco.yaml --cfg yolov5s.yaml --weights '' --sync-bn
@@ -78,7 +78,7 @@ python -m torch.distributed.run --nproc_per_node 2 train.py --batch 64 --data co
 <details markdown>
   <summary>Use Multiple machines (click to expand)</summary>
 
-This is **only** available for Multiple GPU DistributedDataParallel training. 
+This is **only** available for Multiple GPU DistributedDataParallel training.
 
 Before we continue, make sure the files on all machines are the same, dataset, codebase, etc. Afterwards, make sure the machines can communicate to each other.
 
@@ -94,7 +94,7 @@ python -m torch.distributed.run --nproc_per_node G --nnodes N --node_rank 0 --ma
 # On machine R
 python -m torch.distributed.run --nproc_per_node G --nnodes N --node_rank R --master_addr "192.168.1.1" --master_port 1234 train.py --batch 64 --data coco.yaml --cfg yolov5s.yaml --weights ''
 ```
-where `G` is number of GPU per machine, `N` is the number of machines, and `R` is the machine number from `0...(N-1)`. 
+where `G` is number of GPU per machine, `N` is the number of machines, and `R` is the machine number from `0...(N-1)`.
 Let's say I have two machines with two GPUs each, it would be `G = 2` , `N = 2`, and `R = 1` for the above.
 
 Training will not start until <b>all </b> `N` machines are connected. Output will only be shown on master machine!
@@ -128,9 +128,9 @@ cd .. && rm -rf app && git clone https://github.com/ultralytics/yolov5 -b master
 cp data/coco.yaml data/coco_profile.yaml
 
 # profile
-python train.py --batch-size 16 --data coco_profile.yaml --weights yolov5l.pt --epochs 1 --device 0 
-python -m torch.distributed.run --nproc_per_node 2 train.py --batch-size 32 --data coco_profile.yaml --weights yolov5l.pt --epochs 1 --device 0,1   
-python -m torch.distributed.run --nproc_per_node 4 train.py --batch-size 64 --data coco_profile.yaml --weights yolov5l.pt --epochs 1 --device 0,1,2,3  
+python train.py --batch-size 16 --data coco_profile.yaml --weights yolov5l.pt --epochs 1 --device 0
+python -m torch.distributed.run --nproc_per_node 2 train.py --batch-size 32 --data coco_profile.yaml --weights yolov5l.pt --epochs 1 --device 0,1
+python -m torch.distributed.run --nproc_per_node 4 train.py --batch-size 64 --data coco_profile.yaml --weights yolov5l.pt --epochs 1 --device 0,1,2,3
 python -m torch.distributed.run --nproc_per_node 8 train.py --batch-size 128 --data coco_profile.yaml --weights yolov5l.pt --epochs 1 --device 0,1,2,3,4,5,6,7
 ```
 

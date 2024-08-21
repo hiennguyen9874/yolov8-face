@@ -26,16 +26,18 @@ to_4tuple = _ntuple(4)
 # `xyxy` means left top and right bottom
 # `xywh` means center x, center y and width, height(yolo format)
 # `ltwh` means left top and width, height(coco format)
-_formats = ['xyxy', 'xywh', 'ltwh']
+_formats = ["xyxy", "xywh", "ltwh"]
 
-__all__ = 'Bboxes',  # tuple or list
+__all__ = ("Bboxes",)  # tuple or list
 
 
 class Bboxes:
     """Now only numpy is supported."""
 
-    def __init__(self, bboxes, format='xyxy') -> None:
-        assert format in _formats, f'Invalid bounding box format: {format}, format must be one of {_formats}'
+    def __init__(self, bboxes, format="xyxy") -> None:
+        assert (
+            format in _formats
+        ), f"Invalid bounding box format: {format}, format must be one of {_formats}"
         bboxes = bboxes[None, :] if bboxes.ndim == 1 else bboxes
         assert bboxes.ndim == 2
         assert bboxes.shape[1] == 4
@@ -67,21 +69,23 @@ class Bboxes:
 
     def convert(self, format):
         """Converts bounding box format from one type to another."""
-        assert format in _formats, f'Invalid bounding box format: {format}, format must be one of {_formats}'
+        assert (
+            format in _formats
+        ), f"Invalid bounding box format: {format}, format must be one of {_formats}"
         if self.format == format:
             return
-        elif self.format == 'xyxy':
-            bboxes = xyxy2xywh(self.bboxes) if format == 'xywh' else xyxy2ltwh(self.bboxes)
-        elif self.format == 'xywh':
-            bboxes = xywh2xyxy(self.bboxes) if format == 'xyxy' else xywh2ltwh(self.bboxes)
+        elif self.format == "xyxy":
+            bboxes = xyxy2xywh(self.bboxes) if format == "xywh" else xyxy2ltwh(self.bboxes)
+        elif self.format == "xywh":
+            bboxes = xywh2xyxy(self.bboxes) if format == "xyxy" else xywh2ltwh(self.bboxes)
         else:
-            bboxes = ltwh2xyxy(self.bboxes) if format == 'xyxy' else ltwh2xywh(self.bboxes)
+            bboxes = ltwh2xyxy(self.bboxes) if format == "xyxy" else ltwh2xywh(self.bboxes)
         self.bboxes = bboxes
         self.format = format
 
     def areas(self):
         """Return box areas."""
-        self.convert('xyxy')
+        self.convert("xyxy")
         return (self.bboxes[:, 2] - self.bboxes[:, 0]) * (self.bboxes[:, 3] - self.bboxes[:, 1])
 
     # def denormalize(self, w, h):
@@ -133,7 +137,7 @@ class Bboxes:
         return len(self.bboxes)
 
     @classmethod
-    def concatenate(cls, boxes_list: List['Bboxes'], axis=0) -> 'Bboxes':
+    def concatenate(cls, boxes_list: List["Bboxes"], axis=0) -> "Bboxes":
         """
         Concatenate a list of Bboxes objects into a single Bboxes object.
 
@@ -157,7 +161,7 @@ class Bboxes:
             return boxes_list[0]
         return cls(np.concatenate([b.bboxes for b in boxes_list], axis=axis))
 
-    def __getitem__(self, index) -> 'Bboxes':
+    def __getitem__(self, index) -> "Bboxes":
         """
         Retrieve a specific bounding box or a set of bounding boxes using indexing.
 
@@ -178,13 +182,14 @@ class Bboxes:
         if isinstance(index, int):
             return Bboxes(self.bboxes[index].view(1, -1))
         b = self.bboxes[index]
-        assert b.ndim == 2, f'Indexing on Bboxes with {index} failed to return a matrix!'
+        assert b.ndim == 2, f"Indexing on Bboxes with {index} failed to return a matrix!"
         return Bboxes(b)
 
 
 class Instances:
-
-    def __init__(self, bboxes, segments=None, keypoints=None, bbox_format='xywh', normalized=True) -> None:
+    def __init__(
+        self, bboxes, segments=None, keypoints=None, bbox_format="xywh", normalized=True
+    ) -> None:
         """
         Args:
             bboxes (ndarray): bboxes with shape [N, 4].
@@ -252,7 +257,7 @@ class Instances:
 
     def add_padding(self, padw, padh):
         """Handle rect and mosaic situation."""
-        assert not self.normalized, 'you should add padding with absolute coordinates.'
+        assert not self.normalized, "you should add padding with absolute coordinates."
         self._bboxes.add(offset=(padw, padh, padw, padh))
         self.segments[..., 0] += padw
         self.segments[..., 1] += padh
@@ -260,7 +265,7 @@ class Instances:
             self.keypoints[..., 0] += padw
             self.keypoints[..., 1] += padh
 
-    def __getitem__(self, index) -> 'Instances':
+    def __getitem__(self, index) -> "Instances":
         """
         Retrieve a specific instance or a set of instances using indexing.
 
@@ -290,7 +295,7 @@ class Instances:
 
     def flipud(self, h):
         """Flips the coordinates of bounding boxes, segments, and keypoints vertically."""
-        if self._bboxes.format == 'xyxy':
+        if self._bboxes.format == "xyxy":
             y1 = self.bboxes[:, 1].copy()
             y2 = self.bboxes[:, 3].copy()
             self.bboxes[:, 1] = h - y2
@@ -303,7 +308,7 @@ class Instances:
 
     def fliplr(self, w):
         """Reverses the order of the bounding boxes and segments horizontally."""
-        if self._bboxes.format == 'xyxy':
+        if self._bboxes.format == "xyxy":
             x1 = self.bboxes[:, 0].copy()
             x2 = self.bboxes[:, 2].copy()
             self.bboxes[:, 0] = w - x2
@@ -317,10 +322,10 @@ class Instances:
     def clip(self, w, h):
         """Clips bounding boxes, segments, and keypoints values to stay within image boundaries."""
         ori_format = self._bboxes.format
-        self.convert_bbox(format='xyxy')
+        self.convert_bbox(format="xyxy")
         self.bboxes[:, [0, 2]] = self.bboxes[:, [0, 2]].clip(0, w)
         self.bboxes[:, [1, 3]] = self.bboxes[:, [1, 3]].clip(0, h)
-        if ori_format != 'xyxy':
+        if ori_format != "xyxy":
             self.convert_bbox(format=ori_format)
         self.segments[..., 0] = self.segments[..., 0].clip(0, w)
         self.segments[..., 1] = self.segments[..., 1].clip(0, h)
@@ -352,7 +357,7 @@ class Instances:
         return len(self.bboxes)
 
     @classmethod
-    def concatenate(cls, instances_list: List['Instances'], axis=0) -> 'Instances':
+    def concatenate(cls, instances_list: List["Instances"], axis=0) -> "Instances":
         """
         Concatenates a list of Instances objects into a single Instances object.
 
@@ -383,7 +388,11 @@ class Instances:
 
         cat_boxes = np.concatenate([ins.bboxes for ins in instances_list], axis=axis)
         cat_segments = np.concatenate([b.segments for b in instances_list], axis=axis)
-        cat_keypoints = np.concatenate([b.keypoints for b in instances_list], axis=axis) if use_keypoint else None
+        cat_keypoints = (
+            np.concatenate([b.keypoints for b in instances_list], axis=axis)
+            if use_keypoint
+            else None
+        )
         return cls(cat_boxes, cat_segments, cat_keypoints, bbox_format, normalized)
 
     @property

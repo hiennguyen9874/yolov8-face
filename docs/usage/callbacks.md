@@ -14,10 +14,10 @@ In this example, we want to return the original frame with each result object. H
 def on_predict_batch_end(predictor):
     # Retrieve the batch data
     _, _, im0s, _, _ = predictor.batch
-    
+
     # Ensure that im0s is a list
     im0s = im0s if isinstance(im0s, list) else [im0s]
-    
+
     # Combine the prediction results with the corresponding frames
     predictor.results = zip(predictor.results, im0s)
 

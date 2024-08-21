@@ -9,59 +9,68 @@ from ultralytics.yolo.utils import LOGGER
 
 
 class GMC:
-
-    def __init__(self, method='sparseOptFlow', downscale=2, verbose=None):
+    def __init__(self, method="sparseOptFlow", downscale=2, verbose=None):
         """Initialize a video tracker with specified parameters."""
         super().__init__()
 
         self.method = method
         self.downscale = max(1, int(downscale))
 
-        if self.method == 'orb':
+        if self.method == "orb":
             self.detector = cv2.FastFeatureDetector_create(20)
             self.extractor = cv2.ORB_create()
             self.matcher = cv2.BFMatcher(cv2.NORM_HAMMING)
 
-        elif self.method == 'sift':
-            self.detector = cv2.SIFT_create(nOctaveLayers=3, contrastThreshold=0.02, edgeThreshold=20)
-            self.extractor = cv2.SIFT_create(nOctaveLayers=3, contrastThreshold=0.02, edgeThreshold=20)
+        elif self.method == "sift":
+            self.detector = cv2.SIFT_create(
+                nOctaveLayers=3, contrastThreshold=0.02, edgeThreshold=20
+            )
+            self.extractor = cv2.SIFT_create(
+                nOctaveLayers=3, contrastThreshold=0.02, edgeThreshold=20
+            )
             self.matcher = cv2.BFMatcher(cv2.NORM_L2)
 
-        elif self.method == 'ecc':
+        elif self.method == "ecc":
             number_of_iterations = 5000
             termination_eps = 1e-6
             self.warp_mode = cv2.MOTION_EUCLIDEAN
-            self.criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, number_of_iterations, termination_eps)
+            self.criteria = (
+                cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT,
+                number_of_iterations,
+                termination_eps,
+            )
 
-        elif self.method == 'sparseOptFlow':
-            self.feature_params = dict(maxCorners=1000,
-                                       qualityLevel=0.01,
-                                       minDistance=1,
-                                       blockSize=3,
-                                       useHarrisDetector=False,
-                                       k=0.04)
+        elif self.method == "sparseOptFlow":
+            self.feature_params = dict(
+                maxCorners=1000,
+                qualityLevel=0.01,
+                minDistance=1,
+                blockSize=3,
+                useHarrisDetector=False,
+                k=0.04,
+            )
             # self.gmc_file = open('GMC_results.txt', 'w')
 
-        elif self.method in ['file', 'files']:
+        elif self.method in ["file", "files"]:
             seqName = verbose[0]
             ablation = verbose[1]
             if ablation:
-                filePath = r'tracker/GMC_files/MOT17_ablation'
+                filePath = r"tracker/GMC_files/MOT17_ablation"
             else:
-                filePath = r'tracker/GMC_files/MOTChallenge'
+                filePath = r"tracker/GMC_files/MOTChallenge"
 
-            if '-FRCNN' in seqName:
+            if "-FRCNN" in seqName:
                 seqName = seqName[:-6]
-            elif '-DPM' in seqName or '-SDP' in seqName:
+            elif "-DPM" in seqName or "-SDP" in seqName:
                 seqName = seqName[:-4]
-            self.gmcFile = open(f'{filePath}/GMC-{seqName}.txt')
+            self.gmcFile = open(f"{filePath}/GMC-{seqName}.txt")
 
             if self.gmcFile is None:
-                raise ValueError(f'Error: Unable to open GMC file in directory:{filePath}')
-        elif self.method in ['none', 'None']:
-            self.method = 'none'
+                raise ValueError(f"Error: Unable to open GMC file in directory:{filePath}")
+        elif self.method in ["none", "None"]:
+            self.method = "none"
         else:
-            raise ValueError(f'Error: Unknown CMC method:{method}')
+            raise ValueError(f"Error: Unknown CMC method:{method}")
 
         self.prevFrame = None
         self.prevKeyPoints = None
@@ -71,15 +80,15 @@ class GMC:
 
     def apply(self, raw_frame, detections=None):
         """Apply object detection on a raw frame using specified method."""
-        if self.method in ['orb', 'sift']:
+        if self.method in ["orb", "sift"]:
             return self.applyFeatures(raw_frame, detections)
-        elif self.method == 'ecc':
+        elif self.method == "ecc":
             return self.applyEcc(raw_frame, detections)
-        elif self.method == 'sparseOptFlow':
+        elif self.method == "sparseOptFlow":
             return self.applySparseOptFlow(raw_frame, detections)
-        elif self.method == 'file':
+        elif self.method == "file":
             return self.applyFile(raw_frame, detections)
-        elif self.method == 'none':
+        elif self.method == "none":
             return np.eye(2, 3)
         else:
             return np.eye(2, 3)
@@ -110,9 +119,11 @@ class GMC:
         # Run the ECC algorithm. The results are stored in warp_matrix.
         # (cc, H) = cv2.findTransformECC(self.prevFrame, frame, H, self.warp_mode, self.criteria)
         try:
-            (cc, H) = cv2.findTransformECC(self.prevFrame, frame, H, self.warp_mode, self.criteria, None, 1)
+            (cc, H) = cv2.findTransformECC(
+                self.prevFrame, frame, H, self.warp_mode, self.criteria, None, 1
+            )
         except Exception as e:
-            LOGGER.warning(f'WARNING: find transform failed. Set warp as identity {e}')
+            LOGGER.warning(f"WARNING: find transform failed. Set warp as identity {e}")
 
         return H
 
@@ -132,11 +143,11 @@ class GMC:
         # Find the keypoints
         mask = np.zeros_like(frame)
         # mask[int(0.05 * height): int(0.95 * height), int(0.05 * width): int(0.95 * width)] = 255
-        mask[int(0.02 * height):int(0.98 * height), int(0.02 * width):int(0.98 * width)] = 255
+        mask[int(0.02 * height) : int(0.98 * height), int(0.02 * width) : int(0.98 * width)] = 255
         if detections is not None:
             for det in detections:
                 tlbr = (det[:4] / self.downscale).astype(np.int_)
-                mask[tlbr[1]:tlbr[3], tlbr[0]:tlbr[2]] = 0
+                mask[tlbr[1] : tlbr[3], tlbr[0] : tlbr[2]] = 0
 
         keypoints = self.detector.detect(frame, mask)
 
@@ -178,11 +189,14 @@ class GMC:
                 prevKeyPointLocation = self.prevKeyPoints[m.queryIdx].pt
                 currKeyPointLocation = keypoints[m.trainIdx].pt
 
-                spatialDistance = (prevKeyPointLocation[0] - currKeyPointLocation[0],
-                                   prevKeyPointLocation[1] - currKeyPointLocation[1])
+                spatialDistance = (
+                    prevKeyPointLocation[0] - currKeyPointLocation[0],
+                    prevKeyPointLocation[1] - currKeyPointLocation[1],
+                )
 
-                if (np.abs(spatialDistance[0]) < maxSpatialDistance[0]) and \
-                        (np.abs(spatialDistance[1]) < maxSpatialDistance[1]):
+                if (np.abs(spatialDistance[0]) < maxSpatialDistance[0]) and (
+                    np.abs(spatialDistance[1]) < maxSpatialDistance[1]
+                ):
                     spatialDistances.append(spatialDistance)
                     matches.append(m)
 
@@ -233,7 +247,7 @@ class GMC:
                 H[0, 2] *= self.downscale
                 H[1, 2] *= self.downscale
         else:
-            LOGGER.warning('WARNING: not enough matching points')
+            LOGGER.warning("WARNING: not enough matching points")
 
         # Store to next iteration
         self.prevFrame = frame.copy()
@@ -269,7 +283,9 @@ class GMC:
             return H
 
         # Find correspondences
-        matchedKeypoints, status, err = cv2.calcOpticalFlowPyrLK(self.prevFrame, frame, self.prevKeyPoints, None)
+        matchedKeypoints, status, err = cv2.calcOpticalFlowPyrLK(
+            self.prevFrame, frame, self.prevKeyPoints, None
+        )
 
         # Leave good correspondences only
         prevPoints = []
@@ -292,7 +308,7 @@ class GMC:
                 H[0, 2] *= self.downscale
                 H[1, 2] *= self.downscale
         else:
-            LOGGER.warning('WARNING: not enough matching points')
+            LOGGER.warning("WARNING: not enough matching points")
 
         # Store to next iteration
         self.prevFrame = frame.copy()
@@ -307,7 +323,7 @@ class GMC:
     def applyFile(self, raw_frame, detections=None):
         """Return the homography matrix based on the GCPs in the next line of the input GMC file."""
         line = self.gmcFile.readline()
-        tokens = line.split('\t')
+        tokens = line.split("\t")
         H = np.eye(2, 3, dtype=np.float_)
         H[0, 0] = float(tokens[1])
         H[0, 1] = float(tokens[2])

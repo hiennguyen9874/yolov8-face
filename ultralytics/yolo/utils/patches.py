@@ -26,7 +26,7 @@ def imwrite(filename, img):
 
 
 def imshow(path, im):
-    _imshow(path.encode('unicode_escape').decode(), im)
+    _imshow(path.encode("unicode_escape").decode(), im)
 
 
 # PyTorch functions ----------------------------------------------------------------------------------------------------
@@ -40,6 +40,6 @@ def torch_save(*args, **kwargs):
     except ImportError:
         import pickle
 
-    if 'pickle_module' not in kwargs:
-        kwargs['pickle_module'] = pickle
+    if "pickle_module" not in kwargs:
+        kwargs["pickle_module"] = pickle
     return _torch_save(*args, **kwargs)

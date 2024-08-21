@@ -16,14 +16,14 @@ training `data` and arguments as model attributes. See Arguments section below f
 !!! example ""
 
     === "Python"
-    
+
         ```python
         from ultralytics import YOLO
-        
+
         # Load a model
         model = YOLO('yolov8n.pt')  # load an official model
         model = YOLO('path/to/best.pt')  # load a custom model
-        
+
         # Validate the model
         metrics = model.val()  # no arguments needed, dataset and settings remembered
         metrics.box.map    # map50-95
@@ -32,7 +32,7 @@ training `data` and arguments as model attributes. See Arguments section below f
         metrics.box.maps   # a list contains map50-95 of each category
         ```
     === "CLI"
-    
+
         ```bash
         yolo detect val model=yolov8n.pt  # val official model
         yolo detect val model=path/to/best.pt  # val custom model

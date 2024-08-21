@@ -10,7 +10,7 @@ passing `stream=True` in the predictor's call method.
         ```python
         inputs = [img, img]  # list of numpy arrays
         results = model(inputs)  # list of Results objects
-        
+
         for result in results:
             boxes = result.boxes  # Boxes object for bbox outputs
             masks = result.masks  # Masks object for segmentation masks outputs
@@ -21,7 +21,7 @@ passing `stream=True` in the predictor's call method.
         ```python
         inputs = [img, img]  # list of numpy arrays
         results = model(inputs, stream=True)  # generator of Results objects
-        
+
         for result in results:
             boxes = result.boxes  # Boxes object for bbox outputs
             masks = result.masks  # Masks object for segmentation masks outputs
@@ -30,7 +30,7 @@ passing `stream=True` in the predictor's call method.
 
 !!! tip "Tip"
 
-    Streaming mode with `stream=True` should be used for long videos or large predict sources, otherwise results will accumuate in memory and will eventually cause out-of-memory errors. 
+    Streaming mode with `stream=True` should be used for long videos or large predict sources, otherwise results will accumuate in memory and will eventually cause out-of-memory errors.
 
 ## Sources
 
@@ -47,7 +47,7 @@ whether each source can be used in streaming mode with `stream=True` ✅ and an 
 | OpenCV      | `cv2.imread('im.jpg')[:,:,::-1]`           | `np.ndarray`   | HWC, BGR to RGB  |
 | numpy       | `np.zeros((640,1280,3))`                   | `np.ndarray`   | HWC              |
 | torch       | `torch.zeros(16,3,320,640)`                | `torch.Tensor` | BCHW, RGB        |
-| CSV         | `'sources.csv'`                            | `str`, `Path`  | RTSP, RTMP, HTTP |         
+| CSV         | `'sources.csv'`                            | `str`, `Path`  | RTSP, RTMP, HTTP |
 | video ✅     | `'vid.mp4'`                                | `str`, `Path`  |                  |
 | directory ✅ | `'path/'`                                  | `str`, `Path`  |                  |
 | glob ✅      | `'path/*.jpg'`                             | `str`          | Use `*` operator |
@@ -188,7 +188,7 @@ operations are cached, meaning they're only calculated once per object, and thos
     masks = results[0].masks  # Masks object
     masks.xy  # x, y segments (pixels), List[segment] * N
     masks.xyn  # x, y segments (normalized), List[segment] * N
-    masks.data  # raw masks tensor, (N, H, W) or masks.masks 
+    masks.data  # raw masks tensor, (N, H, W) or masks.masks
     ```
 
 ### probs
@@ -240,36 +240,36 @@ Here's a Python script using OpenCV (cv2) and YOLOv8 to run inference on video f
     ```python
     import cv2
     from ultralytics import YOLO
-    
+
     # Load the YOLOv8 model
     model = YOLO('yolov8n.pt')
-    
+
     # Open the video file
     video_path = "path/to/your/video/file.mp4"
     cap = cv2.VideoCapture(video_path)
-    
+
     # Loop through the video frames
     while cap.isOpened():
         # Read a frame from the video
         success, frame = cap.read()
-    
+
         if success:
             # Run YOLOv8 inference on the frame
             results = model(frame)
-    
+
             # Visualize the results on the frame
             annotated_frame = results[0].plot()
-    
+
             # Display the annotated frame
             cv2.imshow("YOLOv8 Inference", annotated_frame)
-    
+
             # Break the loop if 'q' is pressed
             if cv2.waitKey(1) & 0xFF == ord("q"):
                 break
         else:
             # Break the loop if the end of the video is reached
             break
-    
+
     # Release the video capture object and close the display window
     cap.release()
     cv2.destroyAllWindows()
