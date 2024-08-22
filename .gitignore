@@ -224,3 +224,5 @@ $RECYCLE.BIN/
 
 **/logs
 **/temp
+
+weights/

@@ -1,0 +1,23 @@
+name: "FaceDetection"
+platform: "onnxruntime_onnx"
+max_batch_size: 4
+dynamic_batching { }
+input [
+  {
+    name: "images"
+    data_type: TYPE_FP32
+    dims: [ 3, 640, 640 ]
+  }
+]
+output [
+  {
+    name: "output"
+    data_type: TYPE_FP32
+    dims: [ 100, 22 ]
+  }
+]
+instance_group [
+  {
+    kind: KIND_GPU
+  }
+]

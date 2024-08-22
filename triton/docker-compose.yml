@@ -1,0 +1,37 @@
+version: "3.8"
+
+services:
+  triton:
+    image: nvcr.io/nvidia/tritonserver:23.03-py3
+    command:
+      [
+        "tritonserver",
+        "--model-repository=/models",
+        "--strict-model-config=false",
+        "--log-verbose=1",
+        "--backend-config=python,shm-default-byte-size=268435456",
+      ]
+    environment:
+      NVIDIA_VISIBLE_DEVICES: 0
+      NVIDIA_DRIVER_CAPABILITIES: all
+    expose:
+      - 8000 # http port
+      - 8001 # grpc port
+      - 8002
+    volumes:
+      - ./models:/models
+    ports:
+      - 48000:8000
+      - 48001:8001
+      - 48002:8002
+    runtime: nvidia
+    restart: unless-stopped
+    ipc: host
+    shm_size: 4g
+    ulimits:
+      memlock: -1
+      stack: 67108864
+    stdin_open: true # docker run -i
+    tty: true # docker run -t
+    # https://github.com/NVIDIA/nccl/issues/360#issuecomment-670650867
+    pid: host

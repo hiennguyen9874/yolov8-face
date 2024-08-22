@@ -13,7 +13,11 @@ from ultralytics.yolo.utils.tal import dist2bbox, make_anchors
 
 from .block import DFL, Proto
 from .conv import Conv
-from .transformer import DeformableTransformerDecoder, DeformableTransformerDecoderLayer, MLP
+from .transformer import (
+    DeformableTransformerDecoder,
+    DeformableTransformerDecoderLayer,
+    MLP,
+)
 from .utils import bias_init_with_prob, linear_init_
 
 __all__ = "Detect", "Segment", "Pose", "Classify", "RTDETRDecoder"
@@ -32,42 +36,44 @@ class Detect(nn.Module):
         super().__init__()
         self.nc = nc  # number of classes
         self.nl = len(ch)  # number of detection layers
-        self.reg_max = 16  # DFL channels (ch[0] // 16 to scale 4/8/12/16/20 for n/s/m/l/x)
+        self.reg_max = (
+            16  # DFL channels (ch[0] // 16 to scale 4/8/12/16/20 for n/s/m/l/x)
+        )
         self.no = nc + self.reg_max * 4  # number of outputs per anchor
         self.stride = torch.zeros(self.nl)  # strides computed during build
-        c2, c3 = max((16, ch[0] // 4, self.reg_max * 4)), max(ch[0], min(self.nc, 100))  # channels
+        c2, c3 = max((16, ch[0] // 4, self.reg_max * 4)), max(
+            ch[0], min(self.nc, 100)
+        )  # channels
         self.cv2 = nn.ModuleList(
-            nn.Sequential(Conv(x, c2, 3), Conv(c2, c2, 3), nn.Conv2d(c2, 4 * self.reg_max, 1))
+            nn.Sequential(
+                Conv(x, c2, 3), Conv(c2, c2, 3), nn.Conv2d(c2, 4 * self.reg_max, 1)
+            )
             for x in ch
         )
         self.cv3 = nn.ModuleList(
-            nn.Sequential(Conv(x, c3, 3), Conv(c3, c3, 3), nn.Conv2d(c3, self.nc, 1)) for x in ch
+            nn.Sequential(Conv(x, c3, 3), Conv(c3, c3, 3), nn.Conv2d(c3, self.nc, 1))
+            for x in ch
         )
         self.dfl = DFL(self.reg_max) if self.reg_max > 1 else nn.Identity()
 
     def forward(self, x):
         """Concatenates and returns predicted bounding boxes and class probabilities."""
-        shape = x[0].shape  # BCHW
-        # if self.export:
-        #    res = list()
-        #    for i in range(self.nl):
-        #        shape = x[i].shape
-        #        res.append(self.cv2[i](x[i]))
-        #        res.append(self.cv3[i](x[i]).sigmoid())
-        #    return res
         for i in range(self.nl):
             x[i] = torch.cat((self.cv2[i](x[i]), self.cv3[i](x[i])), 1)
-        if self.training:
+        if self.training:  # Training path
             return x
-        if self.export:
-            return x
-        elif self.dynamic or self.shape != shape:
+
+        # Inference path
+        shape = x[0].shape  # BCHW
+        x_cat = torch.cat(
+            [xi.view(xi.shape[0], self.no, xi.shape[2] * xi.shape[3]) for xi in x], 2
+        )
+        if self.dynamic or self.shape != shape:
             self.anchors, self.strides = (
                 x.transpose(0, 1) for x in make_anchors(x, self.stride, 0.5)
             )
             self.shape = shape
 
-        x_cat = torch.cat([xi.view(shape[0], self.no, -1) for xi in x], 2)
         if self.export and self.format in (
             "saved_model",
             "pb",
@@ -79,7 +85,25 @@ class Detect(nn.Module):
             cls = x_cat[:, self.reg_max * 4 :]
         else:
             box, cls = x_cat.split((self.reg_max * 4, self.nc), 1)
-        dbox = dist2bbox(self.dfl(box), self.anchors.unsqueeze(0), xywh=True, dim=1) * self.strides
+
+        if self.export and self.format in ("tflite", "edgetpu"):
+            # Precompute normalization factor to increase numerical stability
+            # See https://github.com/ultralytics/ultralytics/issues/7371
+            grid_h = shape[2]
+            grid_w = shape[3]
+            grid_size = torch.tensor(
+                [grid_w, grid_h, grid_w, grid_h], device=box.device
+            ).reshape(1, 4, 1)
+            norm = self.strides / (self.stride[0] * grid_size)
+            dbox = self.decode_bboxes(
+                self.dfl(box) * norm, self.anchors.unsqueeze(0) * norm[:, :2]
+            )
+        else:
+            dbox = (
+                self.decode_bboxes(self.dfl(box), self.anchors.unsqueeze(0))
+                * self.strides
+            )
+
         y = torch.cat((dbox, cls.sigmoid()), 1)
         return y if self.export else (y, x)
 
@@ -93,6 +117,10 @@ class Detect(nn.Module):
             b[-1].bias.data[: m.nc] = math.log(
                 5 / m.nc / (640 / s) ** 2
             )  # cls (.01 objects, 80 classes, 640 img)
+
+    def decode_bboxes(self, bboxes, anchors):
+        """Decode bounding boxes."""
+        return dist2bbox(bboxes, anchors, xywh=True, dim=1)
 
 
 class Segment(Detect):
@@ -108,7 +136,8 @@ class Segment(Detect):
 
         c4 = max(ch[0] // 4, self.nm)
         self.cv4 = nn.ModuleList(
-            nn.Sequential(Conv(x, c4, 3), Conv(c4, c4, 3), nn.Conv2d(c4, self.nm, 1)) for x in ch
+            nn.Sequential(Conv(x, c4, 3), Conv(c4, c4, 3), nn.Conv2d(c4, self.nm, 1))
+            for x in ch
         )
 
     def forward(self, x):
@@ -123,7 +152,9 @@ class Segment(Detect):
         if self.training:
             return x, mc, p
         return (
-            (torch.cat([x, mc], 1), p) if self.export else (torch.cat([x[0], mc], 1), (x[1], mc, p))
+            (torch.cat([x, mc], 1), p)
+            if self.export
+            else (torch.cat([x[0], mc], 1), (x[1], mc, p))
         )
 
 
@@ -133,35 +164,28 @@ class Pose(Detect):
     def __init__(self, nc=80, kpt_shape=(17, 3), ch=()):
         """Initialize YOLO network with default parameters and Convolutional Layers."""
         super().__init__(nc, ch)
-        self.kpt_shape = (
-            kpt_shape  # number of keypoints, number of dims (2 for x,y or 3 for x,y,visible)
-        )
+        self.kpt_shape = kpt_shape  # number of keypoints, number of dims (2 for x,y or 3 for x,y,visible)
         self.nk = kpt_shape[0] * kpt_shape[1]  # number of keypoints total
         self.detect = Detect.forward
 
         c4 = max(ch[0] // 4, self.nk)
         self.cv4 = nn.ModuleList(
-            nn.Sequential(Conv(x, c4, 3), Conv(c4, c4, 3), nn.Conv2d(c4, self.nk, 1)) for x in ch
+            nn.Sequential(Conv(x, c4, 3), Conv(c4, c4, 3), nn.Conv2d(c4, self.nk, 1))
+            for x in ch
         )
 
     def forward(self, x):
         """Perform forward pass through YOLO model and return predictions."""
         bs = x[0].shape[0]  # batch size
-        # if self.export:
-        #    res = self.detect(self, x)
-        #    for i in range(self.nl):
-        #        res.append(self.cv4[i](x[i]))
-        #    return res
-        if self.export:
-            temp_x = [xi.clone() for xi in x]
-            x = self.detect(self, x)
-            result = list()
-            for i in range(self.nl):
-                result.append(torch.cat([x[i], self.cv4[i](temp_x[i])], 1))
-            return result
-
+        kpts = [self.cv4[i](x[i]) for i in range(self.nl)]
         kpt = torch.cat(
-            [self.cv4[i](x[i]).view(bs, self.nk, -1) for i in range(self.nl)], -1
+            [
+                kpts[i].view(
+                    kpts[i].shape[0], self.nk, kpts[i].shape[2] * kpts[i].shape[3]
+                )
+                for i in range(self.nl)
+            ],
+            2,
         )  # (bs, 17*3, h*w)
         x = self.detect(self, x)
         if self.training:
@@ -179,17 +203,21 @@ class Pose(Detect):
         if (
             self.export
         ):  # required for TFLite export to avoid 'PLACEHOLDER_FOR_GREATER_OP_CODES' bug
-            y = kpts.view(bs, *self.kpt_shape, -1)
+            y = kpts.view(bs, *self.kpt_shape, kpts.shape[2])
             a = (y[:, :, :2] * 2.0 + (self.anchors - 0.5)) * self.strides
             if ndim == 3:
                 a = torch.cat((a, y[:, :, 2:3].sigmoid()), 2)
-            return a.view(bs, self.nk, -1)
+            return a.view(bs, self.nk, a.shape[3])
         else:
             y = kpts.clone()
             if ndim == 3:
                 y[:, 2::3].sigmoid_()  # inplace sigmoid
-            y[:, 0::ndim] = (y[:, 0::ndim] * 2.0 + (self.anchors[0] - 0.5)) * self.strides
-            y[:, 1::ndim] = (y[:, 1::ndim] * 2.0 + (self.anchors[1] - 0.5)) * self.strides
+            y[:, 0::ndim] = (
+                y[:, 0::ndim] * 2.0 + (self.anchors[0] - 0.5)
+            ) * self.strides
+            y[:, 1::ndim] = (
+                y[:, 1::ndim] * 2.0 + (self.anchors[1] - 0.5)
+            ) * self.strides
             return y
 
 
@@ -246,13 +274,16 @@ class RTDETRDecoder(nn.Module):
 
         # backbone feature projection
         self.input_proj = nn.ModuleList(
-            nn.Sequential(nn.Conv2d(x, hd, 1, bias=False), nn.BatchNorm2d(hd)) for x in ch
+            nn.Sequential(nn.Conv2d(x, hd, 1, bias=False), nn.BatchNorm2d(hd))
+            for x in ch
         )
         # NOTE: simplified version but it's not consistent with .pt weights.
         # self.input_proj = nn.ModuleList(Conv(x, hd, act=False) for x in ch)
 
         # Transformer module
-        decoder_layer = DeformableTransformerDecoderLayer(hd, nh, d_ffn, dropout, act, self.nl, ndp)
+        decoder_layer = DeformableTransformerDecoderLayer(
+            hd, nh, d_ffn, dropout, act, self.nl, ndp
+        )
         self.decoder = DeformableTransformerDecoder(hd, decoder_layer, ndl, eval_idx)
 
         # denoising part
@@ -274,7 +305,9 @@ class RTDETRDecoder(nn.Module):
 
         # decoder head
         self.dec_score_head = nn.ModuleList([nn.Linear(hd, nc) for _ in range(ndl)])
-        self.dec_bbox_head = nn.ModuleList([MLP(hd, hd, 4, num_layers=3) for _ in range(ndl)])
+        self.dec_bbox_head = nn.ModuleList(
+            [MLP(hd, hd, 4, num_layers=3) for _ in range(ndl)]
+        )
 
         self._reset_parameters()
 
@@ -332,11 +365,19 @@ class RTDETRDecoder(nn.Module):
 
             valid_WH = torch.tensor([h, w], dtype=dtype, device=device)
             grid_xy = (grid_xy.unsqueeze(0) + 0.5) / valid_WH  # (1, h, w, 2)
-            wh = torch.ones_like(grid_xy, dtype=dtype, device=device) * grid_size * (2.0**i)
-            anchors.append(torch.cat([grid_xy, wh], -1).view(-1, h * w, 4))  # (1, h*w, 4)
+            wh = (
+                torch.ones_like(grid_xy, dtype=dtype, device=device)
+                * grid_size
+                * (2.0**i)
+            )
+            anchors.append(
+                torch.cat([grid_xy, wh], -1).view(-1, h * w, 4)
+            )  # (1, h*w, 4)
 
         anchors = torch.cat(anchors, 1)  # (1, h*w*nl, 4)
-        valid_mask = ((anchors > eps) * (anchors < 1 - eps)).all(-1, keepdim=True)  # 1, h*w*nl, 1
+        valid_mask = ((anchors > eps) * (anchors < 1 - eps)).all(
+            -1, keepdim=True
+        )  # 1, h*w*nl, 1
         anchors = torch.log(anchors / (1 - anchors))
         anchors = anchors.masked_fill(~valid_mask, float("inf"))
         return anchors, valid_mask
@@ -361,7 +402,9 @@ class RTDETRDecoder(nn.Module):
     def _get_decoder_input(self, feats, shapes, dn_embed=None, dn_bbox=None):
         bs = len(feats)
         # prepare input for decoder
-        anchors, valid_mask = self._generate_anchors(shapes, dtype=feats.dtype, device=feats.device)
+        anchors, valid_mask = self._generate_anchors(
+            shapes, dtype=feats.dtype, device=feats.device
+        )
         features = self.enc_output(valid_mask * feats)  # bs, h*w, 256
 
         enc_outputs_scores = self.enc_score_head(features)  # (bs, h*w, nc)
@@ -382,7 +425,9 @@ class RTDETRDecoder(nn.Module):
         )
 
         # Unsigmoided
-        refer_bbox = enc_outputs_bboxes[batch_ind, topk_ind].view(bs, self.num_queries, -1)
+        refer_bbox = enc_outputs_bboxes[batch_ind, topk_ind].view(
+            bs, self.num_queries, -1
+        )
         # refer_bbox = torch.gather(enc_outputs_bboxes, 1, topk_ind.reshape(bs, self.num_queries).unsqueeze(-1).repeat(1, 1, 4))
 
         enc_bboxes = refer_bbox.sigmoid()
@@ -390,7 +435,9 @@ class RTDETRDecoder(nn.Module):
             refer_bbox = torch.cat([dn_bbox, refer_bbox], 1)
         if self.training:
             refer_bbox = refer_bbox.detach()
-        enc_scores = enc_outputs_scores[batch_ind, topk_ind].view(bs, self.num_queries, -1)
+        enc_scores = enc_outputs_scores[batch_ind, topk_ind].view(
+            bs, self.num_queries, -1
+        )
 
         if self.learnt_init_query:
             embeddings = self.tgt_embed.weight.unsqueeze(0).repeat(bs, 1, 1)
