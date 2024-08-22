@@ -226,3 +226,7 @@ $RECYCLE.BIN/
 **/temp
 
 weights/
+
+*.onnx
+*.engine
+*.trt
